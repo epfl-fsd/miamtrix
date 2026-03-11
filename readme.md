@@ -1,8 +1,18 @@
 # Miamtrix
+<div align="center">
+<p>
+  <img src="logo.jpg" alt="Logo Miamtrix" width="150" height="150" style="border-radius: 50%;">
+</p>
+<p>
+  <a href="http://www.freepik.com">Designed by catalyststuff / Freepik</a>
+</p>
+</div>
 
 Miamtrix est un bot Matrix qui sert à connaitre les menus du jour à l'EPFL.
 
 ## Liste des commandes 
+
+- `/start`
 
 - `/oslf`
 > Donne tous les menus qui contiennent des frites.
