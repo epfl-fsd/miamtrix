@@ -7,6 +7,9 @@ use matrix_sdk::{
     },
 };
 mod config;
+mod services;
+
+use crate::services::controller::controller_command;
 
 use crate::config::{AppConfig, CONFIG};
 
@@ -26,9 +29,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn trigger_message(ev: OriginalSyncRoomMessageEvent) {
-    println!("Nouveau message reçu : {:?}", ev.content.body());
-}
+
 
 async fn login_and_sync(
     homeserver_url: String,
@@ -47,7 +48,7 @@ async fn login_and_sync(
         .await?;
 
     println!("logged in as {username}");
-    client.add_event_handler(trigger_message);
+    client.add_event_handler(controller_command);
     let sync_token = client.sync_once(SyncSettings::default()).await.unwrap().next_batch;
 
     let settings = SyncSettings::default().token(sync_token);
