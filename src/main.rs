@@ -8,9 +8,10 @@ use matrix_sdk::{
 };
 mod config;
 mod services;
+mod utils;
 
+use crate::utils::api::ApiClient;
 use crate::services::controller::controller_command;
-
 use crate::config::{AppConfig, CONFIG};
 
 #[tokio::main]
@@ -23,6 +24,7 @@ async fn main() -> anyhow::Result<()> {
     let user = config_app.bot_username.clone();
     let pass = config_app.bot_password.clone();
     CONFIG.set(config_app).expect("Config already init");
+    ApiClient::init();
 
     login_and_sync(url, &user, &pass).await?;
 
