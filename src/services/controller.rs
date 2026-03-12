@@ -31,7 +31,7 @@ pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
             if args.is_empty() {
                 room.send(set_message("Il faut préciser un restaurant dans la commande")).await.unwrap();
             } else {
-                let menu = get_menu(&restaurant_filter.trim()).await;
+                let menu = get_menu(&args.trim()).await;
                 room.send(set_message(&menu)).await.unwrap();
             }
         }
