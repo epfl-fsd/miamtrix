@@ -10,18 +10,18 @@ pub struct ApiClient {
 
 
 }
-pub static API: OnceLock<ApiClient> = OncLock::new();
+pub static API: OnceLock<ApiClient> = OnceLock::new();
 
 impl ApiClient {
     pub fn init() {
         let config = CONFIG.get().expect("la config doit etre chargé avant le client api");
         let instance = ApiClient {
-            base_url: &config.api_uri.clone(),
-            api_password: &config.api_password.clone(),
-            api_username: &config.api_username.clone(),
+            base_url: config.api_uri.clone(),
+            api_password: config.api_password.clone(),
+            api_username: config.api_username.clone(),
             client: Client::new(),
         };
-        API.set(instance).expect("le client api a déjà été initialisé")
+        let _ = API.set(instance);
     }
     pub async fn get() -> Result<(), reqwest::Error> {
         let api = API.get().expect("Le client api n'a pas été initialisé");
