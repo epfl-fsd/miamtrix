@@ -6,11 +6,11 @@ pub async fn get_menu(command: &str) -> String {
     let (restaurant, filter) = get_restaurant_filter(command);
     let cafeteria: Vec<Cafeteria> = response.json().await.unwrap();
 
-    let restorant = cafeteria.into_iter().find(|c| {
+    let menus = cafeteria.into_iter().find(|c| {
         c.name.to_lowercase().contains(&restaurant.to_lowercase())
     });
 
-    match restorant {
+    match menus {
         Some(resto) => {
             let mut message = format!("# Menu du jour pour le restaurant {} \n", resto.name);
             for menu in resto.menu_lines {
@@ -37,9 +37,8 @@ pub async fn get_menu(command: &str) -> String {
 
 fn get_restaurant_filter(params: &str) -> (String, String) {
     let mut mots = params.split_whitespace();
+    let restaurant = mots.next().unwrap_or("").to_lowercase();
+    let filter = mots.next().unwrap_or("").to_lowercase();
 
-        let restaurant = mots.next().unwrap_or("").to_lowercase();
-        let filter = mots.next().unwrap_or("").to_lowercase();
-
-        (restaurant, filter)
+    (restaurant, filter)
 }

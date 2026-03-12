@@ -15,20 +15,37 @@ pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
     let MessageType::Text(text_content) = ev.content.msgtype else {
         return;
     };
+    let commande_line = text_content.body.trim();
 
-    println!("Nouveau message reçu : {:?}", text_content.body);
+    let (commande, args) = match commande_line.split_once(' ') {
+        Some((cmd, reste)) => (cmd, reste),
+        None => (commande_line, ""),
+    };
 
-    if text_content.body.contains("/miam") {
-        let restaurant = get_restaurant("végé");
-        room.send(set_message(restaurant)).await.unwrap();
-    } else if let Some(restaurant_filter) = text_content.body.strip_prefix("/menu") {
-        let menu = get_menu(&restaurant_filter.trim()).await;
-        room.send(set_message(&menu)).await.unwrap();
-    } else if text_content.body.contains("/oslf") {
-        let fries = get_fries();
-        room.send(set_message(&fries)).await.unwrap();
-    } else {
-        println!("Message non compris : {:?}", text_content.body);
+    match commande {
+        "/miam" => {
+            let restaurant = get_restaurant("végé");
+            room.send(set_message(restaurant)).await.unwrap();
+        }
+        "/menu" => {
+            if args.is_empty() {
+                room.send(set_message("Il faut préciser un restaurant dans la commande")).await.unwrap();
+            } else {
+                let menu = get_menu(&restaurant_filter.trim()).await;
+                room.send(set_message(&menu)).await.unwrap();
+            }
+        }
+        "/oslf" => {
+            let fries = get_fries();
+            room.send(set_message(&fries)).await.unwrap();
+        }
+        "/help" => {
+            let help_message = "Commande disponible : `/miam`, `/menu`, `/oslf`, `/help`";
+            room.send(set_message(help_message)).await.unwrap();
+        }
+        _ => {
+            println!("Message ignoré : {}", commande_line)
+        }
     }
 }
 
