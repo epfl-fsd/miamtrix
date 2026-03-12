@@ -9,6 +9,7 @@ use matrix_sdk::{
 mod config;
 mod services;
 mod utils;
+mod models;
 
 use crate::utils::api::ApiClient;
 use crate::services::controller::controller_command;

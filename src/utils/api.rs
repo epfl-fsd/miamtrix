@@ -1,6 +1,7 @@
 use crate::config::CONFIG;
 use std::sync::OnceLock;
 use reqwest::Client;
+use chrono::Local;
 
 pub struct ApiClient {
     base_url: String,
@@ -23,14 +24,14 @@ impl ApiClient {
         };
         let _ = API.set(instance);
     }
-    pub async fn get() -> Result<(), reqwest::Error> {
+    pub async fn get() -> Result<reqwest::Response, reqwest::Error> {
         let api = API.get().expect("Le client api n'a pas été initialisé");
-        let response = api.client
-            .get(&api.base_url)
+        let date = Local::now().format("%Y-%m-%d").to_string();
+        println!("{}",date);
+        api.client
+            .get(format!("{}?date={}", api.base_url, date))
             .basic_auth(&api.api_username, Some(&api.api_password))
             .send()
-            .await?;
-
-        Ok(())
+            .await
     }
 }

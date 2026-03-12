@@ -21,9 +21,9 @@ pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
     if text_content.body.contains("/miam") {
         let restaurant = get_restaurant("végé");
         room.send(set_message(restaurant)).await.unwrap();
-    } else if text_content.body.contains("/menu") {
-        let menu = get_menu("Hopper");
-        room.send(set_message(menu)).await.unwrap();
+    } else if let Some(restaurant_filter) = text_content.body.strip_prefix("/menu") {
+        let menu = get_menu(&restaurant_filter.trim()).await;
+        room.send(set_message(&menu)).await.unwrap();
     } else if text_content.body.contains("/oslf") {
         let fries = get_fries();
         room.send(set_message(&fries)).await.unwrap();
@@ -33,5 +33,5 @@ pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
 }
 
 fn set_message(message: &str) -> RoomMessageEventContent {
-    return RoomMessageEventContent::text_plain(message);
+    return RoomMessageEventContent::text_markdown(message);
 }
