@@ -25,4 +25,3 @@ Miamtrix est un bot Matrix qui sert à connaitre les menus du jour à l'EPFL.
 
 > [!NOTE]
 > La commande `/miam` peut être fusionnée avec la commande `/menu` en ajoutant une détection automatique du paramètre (si c'est un restaurant ou un type de nouriture).
-

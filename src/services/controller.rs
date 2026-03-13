@@ -15,23 +15,40 @@ pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
     let MessageType::Text(text_content) = ev.content.msgtype else {
         return;
     };
+    let commande_line = text_content.body.trim();
 
-    println!("Nouveau message reçu : {:?}", text_content.body);
+    let (commande, args) = match commande_line.split_once(' ') {
+        Some((cmd, reste)) => (cmd, reste),
+        None => (commande_line, ""),
+    };
 
-    if text_content.body.contains("/miam") {
-        let restaurant = get_restaurant("végé");
-        room.send(set_message(restaurant)).await.unwrap();
-    } else if text_content.body.contains("/menu") {
-        let menu = get_menu("Hopper");
-        room.send(set_message(menu)).await.unwrap();
-    } else if text_content.body.contains("/oslf") {
-        let fries = get_fries();
-        room.send(set_message(&fries)).await.unwrap();
-    } else {
-        println!("Message non compris : {:?}", text_content.body);
+    match commande {
+        "/miam" => {
+            let restaurant = get_restaurant("végé");
+            room.send(set_message(restaurant)).await.unwrap();
+        }
+        "/menu" => {
+            if args.is_empty() {
+                room.send(set_message("Il faut préciser un restaurant dans la commande")).await.unwrap();
+            } else {
+                let menu = get_menu(&args.trim()).await;
+                room.send(set_message(&menu)).await.unwrap();
+            }
+        }
+        "/oslf" => {
+            let fries = get_fries();
+            room.send(set_message(&fries)).await.unwrap();
+        }
+        "/help" => {
+            let help_message = "Commande disponible : `/miam`, `/menu`, `/oslf`, `/help`";
+            room.send(set_message(help_message)).await.unwrap();
+        }
+        _ => {
+            println!("Message ignoré : {}", commande_line)
+        }
     }
 }
 
 fn set_message(message: &str) -> RoomMessageEventContent {
-    return RoomMessageEventContent::text_plain(message);
+    return RoomMessageEventContent::text_markdown(message);
 }
