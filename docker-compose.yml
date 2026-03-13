@@ -1,0 +1,11 @@
+services:
+  miamtrix:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: miamtrix_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data
