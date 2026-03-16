@@ -14,15 +14,20 @@ pub async fn get_menu(command: &str) -> String {
         Some(resto) => {
             let mut message = format!("# Menu du jour pour le restaurant {} \n", resto.name);
             for menu in resto.menu_lines {
-                for meal in menu.meals {
-                    let list_plat: Vec<Item> = meal.items
-                        .into_iter()
-                        .filter(|n| n.recipe.name.to_lowercase().contains(&filter))
-                        .collect();
-                    for item in list_plat {
-                        message.push_str(&format!(" - **{}**\n",item.recipe.name))
+                if menu.meals.is_empty() {
+                    message.push_str(&format!(" - **{}**\n", menu.name))
+                } else {
+                    for meal in menu.meals {
+                        let list_plat: Vec<Item> = meal.items
+                            .into_iter()
+                            .filter(|n| n.recipe.name.to_lowercase().contains(&filter))
+                            .collect();
+                        for item in list_plat {
+                            message.push_str(&format!(" - **{}**\n",item.recipe.name))
+                        }
                     }
                 }
+
                 message.push_str("\n");
             }
             message
