@@ -31,8 +31,14 @@ This project uses a Makefile to simplify development and versioning. You can run
 - `make up`
 > Starts the bot in the background using Docker Compose (`docker compose up -d`).
 
-- `make version`
-> Executes the versioning script (`./bump-version.sh`) to bump the project version.
+- `make version-major`
+> Executes the versioning script (`./bump-version.sh`) to bump major version.
+
+- `make version-minor`
+> Executes the versioning script (`./bump-version.sh`) to bump minor version.
+
+- `make version-patch`
+> Executes the versioning script (`./bump-version.sh`) to bump patch version.
 
 - `make down`
 > Stops the Docker containers and removes the associated volumes (`docker compose down -v`).
