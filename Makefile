@@ -4,11 +4,21 @@ SHELL := /bin/bash
 up:
 	docker compose up -d
 
-.PHONY: version
+.PHONY: version-patch
+## Bounce patch version
+version-patch: bump-version.sh
+	./bump-version.sh -p
 
-version: bump-version.sh
-	./bump-version.sh
+.PHONY: version-minor
+## Bounce minor version
+version-minor: bump-version.sh
+	./bump-version.sh -m
 
-.PHONY: d
-d:
+.PHONY: version-major
+## Bounce major version
+version-major: bump-version.sh
+	./bump-version.sh -M
+
+.PHONY: down
+down:
 	docker compose down -v
