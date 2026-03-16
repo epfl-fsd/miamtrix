@@ -5,7 +5,12 @@ services:
       dockerfile: Dockerfile
     container_name: miamtrix_bot
     restart: unless-stopped
-    env_file:
-      - /keybase/team/epfl_matrix/.env
+    environment:
+      - URI_API=${URI_API}
+      - API_PASSWORD=${API_PASSWORD}
+      - API_USERNAME=${API_USERNAME}
+      - URL_SERVER_MATRIX=${URL_SERVER_MATRIX}
+      - USERNAME_BOT=${USERNAME_BOT}
+      - PASSWORD_BOT=${PASSWORD_BOT}
     volumes:
       - ./data:/data

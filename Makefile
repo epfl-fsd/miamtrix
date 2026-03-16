@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 .PHONY: up
 up:
-	docker compose up -d
+	export $(cat /keybase/team/epfl_matrix/.env | xargs); docker compose up -d
 
 .PHONY: version-patch
 ## Bounce patch version
