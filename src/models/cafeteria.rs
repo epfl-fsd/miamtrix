@@ -30,5 +30,6 @@ pub struct Item {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Recipe {
-    pub name: String
+    pub name: String,
+    pub category: String
 }
