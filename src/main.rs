@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 use dotenv::dotenv;
 use matrix_sdk::{
     Client,
