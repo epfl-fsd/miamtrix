@@ -23,11 +23,11 @@ pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
     };
 
     match commande {
-        "/miam" => {
+        "!miam" => {
             let restaurant = get_restaurant("végé");
             room.send(set_message(restaurant)).await.unwrap();
         }
-        "/menu" => {
+        "!menu" => {
             if args.is_empty() {
                 room.send(set_message("Il faut préciser un restaurant dans la commande")).await.unwrap();
             } else {
@@ -35,11 +35,11 @@ pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
                 room.send(set_message(&menu)).await.unwrap();
             }
         }
-        "/oslf" => {
+        "!oslf" => {
             let fries = get_fries();
             room.send(set_message(&fries)).await.unwrap();
         }
-        "/help" => {
+        "!help" => {
             let help_message = "Commande disponible : `/miam`, `/menu`, `/oslf`, `/help`";
             room.send(set_message(help_message)).await.unwrap();
         }
