@@ -1,9 +1,9 @@
 use crate::models::{
-    plat::Plat,
+    dish::Dish,
     cafeteria::Cafeteria
 };
 
-pub fn filter_menu(cafeterias: Vec<Cafeteria>) -> Vec<Plat> {
+pub fn filter_menu(cafeterias: Vec<Cafeteria>) -> Vec<Dish> {
     let mut plats = Vec::new();
 
     for resto in cafeterias {
@@ -11,9 +11,9 @@ pub fn filter_menu(cafeterias: Vec<Cafeteria>) -> Vec<Plat> {
 
         for menu in resto.menu_lines {
             if menu.meals.is_empty() {
-                plats.push(Plat {
+                plats.push(Dish {
                     restaurant: cafet_name.clone(),
-                    type_menu: menu.name.clone(),
+                    menu_type: menu.name.clone(),
                     name: menu.name.clone(),
                     category: "unclassified".to_string()
                 });
@@ -22,9 +22,9 @@ pub fn filter_menu(cafeterias: Vec<Cafeteria>) -> Vec<Plat> {
 
             for meal in menu.meals {
                 for item in meal.items {
-                    plats.push(Plat {
+                    plats.push(Dish {
                         restaurant: cafet_name.clone(),
-                        type_menu: menu.name.clone(),
+                        menu_type: menu.name.clone(),
                         name: item.recipe.name.clone(),
                         category: item.recipe.category.clone(),
                     })

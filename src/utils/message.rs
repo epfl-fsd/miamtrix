@@ -1,11 +1,11 @@
-use crate::models::plat::Plat;
+use crate::models::dish::Dish;
 
-pub fn message(plats: Vec<Plat>) -> String {
+pub fn message(dishes: Vec<Dish>) -> String {
     let mut message = format!("# Menu du jour\n");
-    for plat in plats {
-        message.push_str(&format!(" - Nom: `{}`\n", plat.name));
-        message.push_str(&format!("Resaurant: `{}`\n", plat.restaurant));
-        message.push_str(&format!("Type: `{}`\n", plat.category));
+    for dish in dishes {
+        message.push_str(&format!(" - Nom: `{}`\n", dish.name));
+        message.push_str(&format!("Restaurant: `{}`\n", dish.restaurant));
+        message.push_str(&format!("Type: # {}\n", dish.category));
     }
     message
 }

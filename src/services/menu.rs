@@ -1,7 +1,7 @@
 use crate::utils::api::ApiClient;
 use crate::models::{
     cafeteria::Cafeteria,
-    plat::Plat,
+    dish::Dish,
 };
 use crate::utils::{
     filter_menu::filter_menu,
@@ -12,13 +12,13 @@ pub async fn get_menu(command: &str) -> String {
     let response = ApiClient::get().await.unwrap();
     let (restaurant, filter) = get_restaurant_filter(command);
     let cafeteria: Vec<Cafeteria> = response.json().await.unwrap();
-    let mut plats: Vec<Plat> = filter_menu(cafeteria);
+    let mut dishes: Vec<Dish> = filter_menu(cafeteria);
     if !restaurant.is_empty() {
-        plats = plats.into_iter()
-            .filter(|p| p.restaurant.to_lowercase().contains(&restaurant) && p.name.to_lowercase().contains(&filter))
+        dishes = dishes.into_iter()
+            .filter(|d| d.restaurant.to_lowercase().contains(&restaurant) && d.name.to_lowercase().contains(&filter))
             .collect();
     }
-    let message: String = message(plats);
+    let message: String = message(dishes);
     message
 }
 

@@ -1,2 +1,2 @@
 pub mod cafeteria;
-pub mod plat;
+pub mod dish;
