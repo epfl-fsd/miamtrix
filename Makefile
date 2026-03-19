@@ -50,8 +50,8 @@ commit:
 tag:
 	NEW_VERSION=$$(grep -m 1 '^version =' Cargo.toml | sed 's/version = //;s/"//g') && \
 	git tag v$$NEW_VERSION
-	git push origin v$$NEW_VERSION
+	git push --tag
 
 ## Create a gh release with a changelog and the latest tag
 release: create-gh-release.sh
-	create-gh-release.sh
+	./create-gh-release.sh

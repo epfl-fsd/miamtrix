@@ -29,7 +29,6 @@ function printInfo() {
 }
 
 function generate_changelog() {
-
   LATEST_RELEASE_TAG=$(curl -s -H "$AUTH" "$GH_API/repos/$REPO_ORG_OR_USR/$REPO_NAME/releases/latest" | jq -r .tag_name)
 
   if [ "$LATEST_RELEASE_TAG" == "null" ] || [ -z "$LATEST_RELEASE_TAG" ]; then
@@ -38,25 +37,32 @@ function generate_changelog() {
     LOG_RANGE="${LATEST_RELEASE_TAG}..HEAD"
   fi
 
+  FEATURE_NOTES=$(git log $LOG_RANGE --no-merges --pretty=format:"- %s" | grep -i '\[feature\]' | sed -E 's/-\s*\[[a-zA-Z]+\]\s*/- /' || true)
+  FIX_NOTES=$(git log $LOG_RANGE --no-merges --pretty=format:"- %s" | grep -i '\[fix\]' | sed -E 's/-\s*\[[a-zA-Z]+\]\s*/- /' || true)
+  RELEASE_NOTES=""
 
-  RAW_NOTES=$(git log $LOG_RANGE --no-merges --pretty=format:"- %s" | grep -iE '\[feature\]|\[fix\]' || true)
-
-  if [ -z "$RAW_NOTES" ]; then
-    RAW_NOTES="- No new feature or fix for this version."
+  if [ -n "$FEATURE_NOTES" ]; then
+      RELEASE_NOTES+="### ✨ New features"$'\n'"$FEATURE_NOTES"$'\n\n'
   fi
 
-  RELEASE_NOTES="### New feature and fix :\n$RAW_NOTES"
+  if [ -n "$FIX_NOTES" ]; then
+    RELEASE_NOTES+="### 🐛 Fixes"$'\n'"$FIX_NOTES"$'\n\n'
+  fi
 
-  echo -e "\n--- Changelog ---"
-  echo -e "$RELEASE_NOTES"
-  echo -e "---------------------------\n"
+  if [ -z "$RELEASE_NOTES" ]; then
+    RELEASE_NOTES="- No new features or fixes for this version."
+  fi
+
+  echo -e "\n--- Changelog Preview ---"
+  echo "$RELEASE_NOTES"
+  echo -e "-------------------------\n"
 }
 
 function create_release () {
 
   RELEASE_JSON=$(jq -n \
     --arg tag "v$VERSION" \
-    --arg name "Release v$VERSION" \
+    --arg name "v$VERSION" \
     --arg body "$RELEASE_NOTES" \
     '{tag_name: $tag, name: $name, body: $body, draft: false, prerelease: false}')
 
