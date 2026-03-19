@@ -11,6 +11,15 @@ use crate::utils::{
 
 pub async fn get_menu(command: &str) -> String {
     let response = ApiClient::get().await.unwrap();
+    let cafeterias: Vec<Cafeteria> = response.json().await.unwrap();
+    if command.is_empty() {
+        let mut message = format!("Please put a restaurant in the command (usage : !menu [restaurant])\n");
+        let _ = writeln!(message, "### Restaurant list :\n");
+        for resto in cafeterias {
+            let _ = writeln!(message, "- {}\n", &resto.name);
+        }
+        return message;
+    }
     let (restaurant, filter) = get_restaurant_filter(command);
     let mut dishes: Vec<Dish> = filter_menu(cafeterias);
     if !restaurant.is_empty() {
