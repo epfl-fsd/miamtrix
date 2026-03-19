@@ -36,7 +36,12 @@ pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
             room.send(set_message(&fries)).await.unwrap();
         }
         "!help" => {
-            let help_message = "Commande disponible : `/miam`, `/menu`, `/oslf`, `/help`";
+            let help_message = "\
+            Available commands: `!menu`, `!yum`, `!oslf`, `!help`
+            `!menu` [restaurant] [filter]  Get a restaurant's menu with an optional filter (e.g., pizza)
+            `!yum`                         Sorry, not implemented yet! Coming soon.
+            `!oslf`                        Sorry, not implemented yet! Coming soon.
+            `!help`                        Get help with commands\n";
             room.send(set_message(help_message)).await.unwrap();
         }
         _ => {
