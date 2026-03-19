@@ -5,7 +5,7 @@ use matrix_sdk::{
     },
 };
 use super::menu::get_menu;
-use super::miam::get_restaurant;
+use super::yum::get_restaurant;
 use super::oslf::get_fries;
 
 pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
@@ -23,17 +23,13 @@ pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
     };
 
     match commande {
-        "!miam" => {
+        "!yum" => {
             let restaurant = get_restaurant("végé");
             room.send(set_message(restaurant)).await.unwrap();
         }
         "!menu" => {
-            if args.is_empty() {
-                room.send(set_message("Il faut préciser un restaurant dans la commande")).await.unwrap();
-            } else {
-                let menu = get_menu(&args.trim()).await;
-                room.send(set_message(&menu)).await.unwrap();
-            }
+            let menu = get_menu(&args.trim()).await;
+            room.send(set_message(&menu)).await.unwrap();
         }
         "!oslf" => {
             let fries = get_fries();
