@@ -17,5 +17,11 @@ pub async fn get_restaurant(food_type: &str) -> String {
         let message = format!("Please say what do you wnat to eat in the command (usage : !yum [filter])\n");
         return message;
     }
-    return "restaurant".to_string();
+    //filtrer les plats avec le filtre
+    dishes = dishes.into_iter()
+        .filter(|d| d.name.to_lowercase().contains(&food_type))
+        .collect();
+    //retourner le message markdown
+    let message = message(dishes);
+    return message;
 }
