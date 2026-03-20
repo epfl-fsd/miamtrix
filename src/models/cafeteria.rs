@@ -17,6 +17,7 @@ pub struct Menu {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Meal {
+    #[serde(default)]
     pub items: Vec<Item>
 }
 
