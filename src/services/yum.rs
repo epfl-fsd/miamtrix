@@ -10,18 +10,22 @@ use crate::utils::{
 };
 
 pub async fn get_restaurant(food_type: &str) -> String {
-    let response = ApiClient::get().await.unwrap();
-    let cafeterias: Vec<Cafeteria> = response.json().await.unwrap();
-    let mut dishes: Vec<Dish> = filter_menu(cafeterias);
+    let search = food_type.trim().to_lowercase();
     if food_type.is_empty() {
         let message = format!("Please say what do you wnat to eat in the command (usage : !yum [filter])\n");
         return message;
     }
-    //filtrer les plats avec le filtre
+    let response = ApiClient::get().await.unwrap();
+    let cafeterias: Vec<Cafeteria> = response.json().await.unwrap();
+    let mut dishes: Vec<Dish> = filter_menu(cafeterias);
+
     dishes = dishes.into_iter()
-        .filter(|d| d.name.to_lowercase().contains(&food_type))
+        .filter(|d| {
+            let name = d.name.to_lowercase();
+            let restaurant = d.restaurant.to_lowercase();
+            let r#type = d.menu_type.to_lowercase();
+            return name.contains(&search) || r#type.contains(&search) || restaurant.contains(&search)
+        })
         .collect();
-    //retourner le message markdown
-    let message = message(dishes);
-    return message;
+    message(dishes)
 }
