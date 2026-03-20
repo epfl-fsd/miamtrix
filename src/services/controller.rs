@@ -24,8 +24,8 @@ pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
 
     match commande {
         "!yum" => {
-            let restaurant = get_restaurant("végé");
-            room.send(set_message(restaurant)).await.unwrap();
+            let restaurant = get_restaurant(&args.trim()).await;
+            room.send(set_message(&restaurant)).await.unwrap();
         }
         "!menu" => {
             let menu = get_menu(&args.trim()).await;
