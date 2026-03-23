@@ -16,12 +16,12 @@ pub static CONFIG: OnceLock<AppConfig> = OnceLock::new();
 impl AppConfig {
     pub fn load_env() -> Self {
         AppConfig {
-            api_uri: env::var("URI_API").expect("Variable manquante"),
-            api_username: env::var("API_USERNAME").expect("Variable manquante"),
-            api_password: env::var("API_PASSWORD").expect("Variable manquante"),
-            bot_username: env::var("USERNAME_BOT").expect("Variable manquante"),
-            bot_password: env::var("PASSWORD_BOT").expect("Variable manquante"),
-            url_server_matrix: env::var("URL_SERVER_MATRIX").expect("Variable manquante"),
+            api_uri: env::var("URI_API").expect("Missing variable"),
+            api_username: env::var("API_USERNAME").expect("Missing variable"),
+            api_password: env::var("API_PASSWORD").expect("Missing variable"),
+            bot_username: env::var("USERNAME_BOT").expect("Missing variable"),
+            bot_password: env::var("PASSWORD_BOT").expect("Missing variable"),
+            url_server_matrix: env::var("URL_SERVER_MATRIX").expect("Missing variable"),
         }
     }
 }
