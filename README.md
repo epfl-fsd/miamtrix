@@ -12,17 +12,14 @@ Miamtrix is a Matrix bot that helps you check the daily menus at EPFL.
 
 ## Commands
 
-- `/oslf`
+- `!oslf`
 > Returns all menus that contain fries.
 
-- `/menu [restaurant] [filter]`
+- `!menu [restaurant] [filter]`
 > Returns the daily menu for the restaurant specified in the parameter. If no restaurant is specified, all daily menus are returned.
 
-- `/miam [food type]` (e.g., veg, asian, dessert)
-> Returns all restaurants and their menus that match the specified food type.
-
-> [!NOTE]
-> The `/miam` command can be merged with the `/menu` command by adding automatic parameter detection (to determine if the input is a restaurant or a food type).
+- `!yum [keyword] -a` (e.g., veg, asian, dessert)
+> Returns all restaurants and their menus that match with the specified keyword. You can also exclude keyword with `!` (e.g., !fish). If you have some alergen exclude yours with the flag -a (e.g., -a gluten).
 
 ## Makefile Commands
 
@@ -30,6 +27,27 @@ This project uses a Makefile to simplify development and versioning. You can run
 
 - `make up`
 > Starts the bot in the background using Docker Compose (`docker compose up -d`).
+
+- `make down`
+> Stops the Docker containers and removes the associated volumes (`docker compose down -v`).
+
+- `make new-major-version`
+> Change major version with commit, tag and gh release.
+
+- `new-minor-version`
+> Change minor version with commit, tag and gh release.
+
+- `make new-patch-version`
+> Change patch version with commit, tag and gh release.
+
+- `make release`
+> Create a gh release with a changelog and the latest tag.
+
+- `make tag`
+> Create a tag with the actual version and push.
+
+- `make commit`
+> Commit Cargo's file change with a message bump version.
 
 - `make version-major`
 > Executes the versioning script (`./bump-version.sh`) to bump major version.
@@ -39,6 +57,3 @@ This project uses a Makefile to simplify development and versioning. You can run
 
 - `make version-patch`
 > Executes the versioning script (`./bump-version.sh`) to bump patch version.
-
-- `make down`
-> Stops the Docker containers and removes the associated volumes (`docker compose down -v`).
