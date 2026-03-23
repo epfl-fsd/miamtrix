@@ -21,6 +21,12 @@ Miamtrix is a Matrix bot that helps you check the daily menus at EPFL.
 - `!yum [keyword] -a` (e.g., veg, asian, dessert)
 > Returns all restaurants and their menus that match with the specified keyword. You can also exclude keyword with `!` (e.g., !fish). If you have some alergen exclude yours with the flag -a (e.g., -a gluten).
 
+- `!list`
+> List all restaurant across EPFL's campus.
+
+- `!help`
+> Lists all available commands and their explanations, along with the bot's version and source code link.
+
 ## Makefile Commands
 
 This project uses a Makefile to simplify development and versioning. You can run the following commands in your terminal:

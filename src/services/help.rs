@@ -8,6 +8,7 @@ pub fn get_help() -> String {
     `!menu` [restaurant] [filter]       Get a restaurant's menu with an optional filter (e.g., pizza)
     `!yum`  [keyword] [-a <alergen>]    Search all EPFL menus for a food (e.g., pizza), Use `!` to exclude (e.g., !fish), Use `-a` to specify an alergen (e.g., -a gluten).
     `!oslf`                             List locations of french fries across EPFL's campus.
+    `!list`                             List all restaurant across EPFL's campus.
     `!help`                             Get help with commands.
     version: `{}`, [source code]({}).", config.bot_version, config.bot_repo);
 
