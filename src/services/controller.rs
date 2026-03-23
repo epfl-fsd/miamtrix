@@ -38,10 +38,10 @@ pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
         "!help" => {
             let help_message = "\
             Available commands: `!menu`, `!yum`, `!oslf`, `!help`
-            `!menu` [restaurant] [filter]  Get a restaurant's menu with an optional filter (e.g., pizza)
-            `!yum`  [keyword]              Search all EPFL menus for a food (e.g., pizza). Use `!` to exclude (e.g., !fish).
-            `!oslf`                        Sorry, not implemented yet! Coming soon.
-            `!help`                        Get help with commands\n";
+            `!menu` [restaurant] [filter]       Get a restaurant's menu with an optional filter (e.g., pizza)
+            `!yum`  [keyword] [-a <alergen>]    Search all EPFL menus for a food (e.g., pizza), Use `!` to exclude (e.g., !fish), Use `-a` to specify an alergen (e.g., -a gluten).
+            `!oslf`                             Sorry, not implemented yet! Coming soon.
+            `!help`                             Get help with commands\n";
             room.send(set_message(help_message)).await.unwrap();
         }
         _ => {
