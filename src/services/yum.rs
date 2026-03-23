@@ -15,6 +15,11 @@ pub async fn get_restaurant(food_type: &str) -> String {
         return "Please specify what you want to eat (or avoid)!\n✅ Include: !yum [food] (e.g., !yum pizza)\n❌ Exclude: !yum ![food] (e.g., !yum !fish)\n".to_string();
     };
 
+    let (query, alergen) = match search.split_once("-a") {
+        Some((q, f)) => (q.trim(), Some(f.trim())),
+        None => (search.as_str(), None),
+    };
+
     let response = match ApiClient::get().await {
       Ok(resp) => resp,
       Err(_) => return "Error, could not reach the restaurant API.".to_string(),
@@ -27,13 +32,22 @@ pub async fn get_restaurant(food_type: &str) -> String {
 
     let mut dishes: Vec<Dish> = filter_menu(cafeterias);
 
-    let (is_exclusion, term) = if search.starts_with('!') {
-        (true, &search[1..])
+    let (is_exclusion, term) = if query.starts_with('!') {
+        (true, &query[1..])
     } else {
-        (false, search.as_str())
+        (false, query)
     };
 
     dishes.retain(|d| {
+        if let Some(a) = alergen {
+            let contains_alergen = d.alergen.iter().any(|al| {
+                let al_lower = al.to_lowercase();
+                al_lower.contains(a) || al_lower == "alergen not specified"
+            });
+            if contains_alergen {
+                return false;
+            }
+        }
         let name = d.name.to_lowercase();
         let restaurant = d.restaurant.to_lowercase();
         let r#type = d.menu_type.to_lowercase();
