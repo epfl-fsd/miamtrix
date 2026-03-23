@@ -1,5 +1,4 @@
 use crate::utils::api::ApiClient;
-use std::fmt::Write;
 use crate::models::{
     cafeteria::Cafeteria,
     dish::Dish,
