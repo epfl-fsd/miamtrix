@@ -12,7 +12,7 @@ use crate::utils::{
 pub async fn get_restaurant(food_type: &str) -> String {
     let search = food_type.trim().to_lowercase();
     if search.is_empty() {
-        return "Please say what do you want to eat in the command (usage : !yum [filter])\n".to_string();
+        return "Please specify what you want to eat (or avoid)!\n✅ Include: !yum [food] (e.g., !yum pizza)\n❌ Exclude: !yum ![food] (e.g., !yum !fish)\n".to_string();
     };
 
     let response = match ApiClient::get().await {
