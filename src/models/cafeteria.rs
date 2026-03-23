@@ -31,5 +31,13 @@ pub struct Item {
 #[serde(rename_all = "camelCase")]
 pub struct Recipe {
     pub name: String,
-    pub category: String
+    pub category: String,
+    #[serde(default)]
+    pub labels: Vec<Label>
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Label {
+    pub label: String,
 }
