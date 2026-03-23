@@ -4,6 +4,8 @@ use matrix_sdk::{
         message::{OriginalSyncRoomMessageEvent, MessageType, RoomMessageEventContent},
     },
 };
+
+use super::list::list_restaurant;
 use super::menu::get_menu;
 use super::yum::get_restaurant;
 use super::oslf::get_fries;
@@ -35,6 +37,10 @@ pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
         "!oslf" => {
             let fries = get_fries().await;
             room.send(set_message(&fries)).await.unwrap();
+        }
+        "!list" => {
+            let list = list_restaurant().await;
+            room.send(set_message(&list)).await.unwrap();
         }
         "!help" => {
             let help_message = get_help();
