@@ -32,7 +32,7 @@ pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
             room.send(set_message(&menu)).await.unwrap();
         }
         "!oslf" => {
-            let fries = get_fries();
+            let fries = get_fries().await;
             room.send(set_message(&fries)).await.unwrap();
         }
         "!help" => {
