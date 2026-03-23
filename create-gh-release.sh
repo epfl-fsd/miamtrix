@@ -39,6 +39,7 @@ function generate_changelog() {
 
   FEATURE_NOTES=$(git log $LOG_RANGE --no-merges --pretty=format:"- %s" | grep -i '\[feature\]' | sed -E 's/-\s*\[[a-zA-Z]+\]\s*/- /' || true)
   FIX_NOTES=$(git log $LOG_RANGE --no-merges --pretty=format:"- %s" | grep -i '\[fix\]' | sed -E 's/-\s*\[[a-zA-Z]+\]\s*/- /' || true)
+  DOC_NOTES=$(git log $LOG_RANGE --no-merges --pretty=format:"- %s" | grep -i '\[documentation\]' | sed -E 's/-\s*\[[a-zA-Z]+\]\s*/- /' || true)
   RELEASE_NOTES=""
 
   if [ -n "$FEATURE_NOTES" ]; then
@@ -47,6 +48,10 @@ function generate_changelog() {
 
   if [ -n "$FIX_NOTES" ]; then
     RELEASE_NOTES+="### 🐛 Fixes"$'\n'"$FIX_NOTES"$'\n\n'
+  fi
+
+  if [ -n "$DOC_NOTES" ]; then
+    RELEASE_NOTES+="### 📖 Docs"$'\n'"$DOC_NOTES"$'«\n\n'
   fi
 
   if [ -z "$RELEASE_NOTES" ]; then
