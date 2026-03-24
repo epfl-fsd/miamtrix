@@ -11,6 +11,7 @@ pub struct AppConfig {
     pub url_server_matrix: String,
     pub bot_version: String,
     pub bot_repo: String,
+    pub db_url: String,
 }
 
 pub static CONFIG: OnceLock<AppConfig> = OnceLock::new();
@@ -26,6 +27,7 @@ impl AppConfig {
             url_server_matrix: env::var("URL_SERVER_MATRIX").expect("Missing variable"),
             bot_version: env!("CARGO_PKG_VERSION").to_string(),
             bot_repo: env!("CARGO_PKG_REPOSITORY").to_string(),
+            db_url: env::var("DATABASE_URL").expect("Missing variable"),
         }
     }
 }

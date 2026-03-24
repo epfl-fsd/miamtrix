@@ -16,7 +16,9 @@ mod services;
 mod utils;
 mod models;
 mod schema;
+mod db;
 
+use crate::db::DbClient;
 use crate::utils::api::ApiClient;
 use crate::services::controller::controller_command;
 use crate::config::{AppConfig, CONFIG};
@@ -30,8 +32,10 @@ async fn main() -> anyhow::Result<()> {
     let url = config_app.url_server_matrix.clone();
     let user = config_app.bot_username.clone();
     let pass = config_app.bot_password.clone();
+    let db_url = config_app.db_url.clone();
     CONFIG.set(config_app).expect("Config already init");
     ApiClient::init();
+    DbClient::init(&db_url);
 
     login_and_sync(url, &user, &pass).await?;
 
