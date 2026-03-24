@@ -1,31 +1,33 @@
 use matrix_sdk::{
+    Client,
     Room, RoomState,
-    ruma::events::room::{
+    ruma::{
+        events::room::{
         message::{OriginalSyncRoomMessageEvent, MessageType, RoomMessageEventContent},
-    },
+        },
+        RoomId,
+    }
 };
+use tokio::process::Command;
 
 use super::list::list_restaurant;
 use super::menu::get_menu;
 use super::yum::get_restaurant;
 use super::oslf::get_fries;
 use super::help::get_help;
+use super::schedule::ScheduleClient;
 
-pub async fn controller_command(ev: OriginalSyncRoomMessageEvent, room: Room) {
-    if room.state() != RoomState::Joined {
-        return;
-    }
-    let MessageType::Text(text_content) = ev.content.msgtype else {
-        return;
-    };
-    let commande_line = text_content.body.trim();
-
+pub async fn controller_command(commande_line: &str, room: Room) {
     let (commande, args) = match commande_line.split_once(' ') {
         Some((cmd, reste)) => (cmd, reste),
         None => (commande_line, ""),
     };
 
     match commande {
+        "!schedule" => {
+            let response = ScheduleClient::controller_schedule(&args, &room.room_id().to_string()).await;
+            room.send(set_message(&response)).await.unwrap();
+        }
         "!yum" => {
             let restaurant = get_restaurant(&args.trim()).await;
             room.send(set_message(&restaurant)).await.unwrap();

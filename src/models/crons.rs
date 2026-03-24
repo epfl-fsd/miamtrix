@@ -45,4 +45,16 @@ impl Cron {
             .load(&mut conn)
             .expect("Failed to load all crons")
     }
+
+    pub fn get_by_job_id(target_job_id: &str) -> Option<Cron> {
+        use crate::schema::crons::dsl::*;
+        let mut conn = DbClient::get_connection();
+
+        crons
+            .filter(job_id.eq(target_job_id))
+            .select(Cron::as_select())
+            .first(&mut conn)
+            .optional()
+            .expect("Failed to load cron by  job id")
+    }
 }
