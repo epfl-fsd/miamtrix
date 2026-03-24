@@ -18,6 +18,10 @@ up:
 down:
 	docker compose down -v
 
+## Mount container postgresql for dev
+db-dev:
+	docker compose -f docker-compose.dev.yml up
+
 ## Bounce patch version
 version-patch: bump-version.sh
 	./bump-version.sh -p
