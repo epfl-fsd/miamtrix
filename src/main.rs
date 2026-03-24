@@ -15,6 +15,7 @@ mod config;
 mod services;
 mod utils;
 mod models;
+mod schema;
 
 use crate::utils::api::ApiClient;
 use crate::services::controller::controller_command;
