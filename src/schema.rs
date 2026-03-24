@@ -6,5 +6,6 @@ diesel::table! {
         room -> Varchar,
         cron_expression -> Varchar,
         command -> Varchar,
+        job_id -> Varchar,
     }
 }
