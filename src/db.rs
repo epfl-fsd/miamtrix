@@ -1,6 +1,6 @@
 use diesel::{
     pg::PgConnection,
-    r2d2::{ConnectionManager, Pool}
+    r2d2::{ConnectionManager, Pool, PooledConnection}
 };
 use std::sync::OnceLock;
 
@@ -18,5 +18,13 @@ impl DbClient {
             .expect("Failed to create db pool");
 
         let _ = DB_POOL.set(pool);
+    }
+
+    pub fn get_connection() -> PooledConnection<ConnectionManager<PgConnection>> {
+        DB_POOL
+            .get()
+            .expect("DB is not initialised.")
+            .get()
+            .expect("Failed to get pool connection")
     }
 }
