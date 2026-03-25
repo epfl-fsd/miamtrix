@@ -4,21 +4,27 @@ use dotenv::dotenv;
 use matrix_sdk::{
     Client,
     config::SyncSettings,
-    Room,
+    Room, RoomState,
     ruma::events::room::{
         member::StrippedRoomMemberEvent,
+        message::{MessageType, OriginalSyncRoomMessageEvent},
     },
 };
 use tokio::time::{Duration, sleep};
+use std::sync::OnceLock;
 
 mod config;
 mod services;
 mod utils;
 mod models;
+mod schema;
+mod db;
 
+use crate::db::DbClient;
 use crate::utils::api::ApiClient;
 use crate::services::controller::controller_command;
 use crate::config::{AppConfig, CONFIG};
+pub static MATRIX_CLIENT: OnceLock<Client> = OnceLock::new();
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -29,8 +35,10 @@ async fn main() -> anyhow::Result<()> {
     let url = config_app.url_server_matrix.clone();
     let user = config_app.bot_username.clone();
     let pass = config_app.bot_password.clone();
+    let db_url = config_app.db_url.clone();
     CONFIG.set(config_app).expect("Config already init");
     ApiClient::init();
+    DbClient::init(&db_url);
 
     login_and_sync(url, &user, &pass).await?;
 
@@ -48,7 +56,7 @@ async fn login_and_sync(
         .homeserver_url(homeserver_url)
         .build()
         .await?;
-
+    MATRIX_CLIENT.set(client.clone()).expect("Error, Matrix client is already initialised");
     client
         .matrix_auth()
         .login_username(username, password)
@@ -56,7 +64,7 @@ async fn login_and_sync(
         .await?;
 
     println!("logged in as {username}");
-    client.add_event_handler(controller_command);
+    client.add_event_handler(message_listener);
     //Add auto join function to handler
     client.add_event_handler(auto_accept_invites);
     let sync_token = client.sync_once(SyncSettings::default()).await.unwrap().next_batch;
@@ -94,4 +102,16 @@ async fn auto_accept_invites(
         }
         println!("Successfully joined room {}", room.room_id());
     });
+}
+
+async fn message_listener(ev: OriginalSyncRoomMessageEvent, room: Room) {
+    if room.state() != RoomState::Joined {
+        return;
+    }
+    let MessageType::Text(text_content) = ev.content.msgtype else {
+        return;
+    };
+
+    let commande_line = text_content.body.trim();
+    controller_command(&commande_line, room).await;
 }
