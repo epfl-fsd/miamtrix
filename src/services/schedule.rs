@@ -32,13 +32,18 @@ impl ScheduleClient {
         let command_closure = command.clone();
         let handle = Handle::current();
         let cron_expression = format!("0 30 11 * * {} *", cron);
-        let job_id = scheduler.add_fn(&cron_expression, move || {
+        let job_id = match scheduler.add_fn(&cron_expression, move || {
             let r_id = room_id_closure.clone();
             let cmd = command_closure.clone();
             handle.spawn(async move {
                 Self::cron_job(&r_id, &cmd).await;
             });
-        }).expect("Failed to create new cron");
+        }) {
+          Ok(id) => id,
+          Err(_) => {
+              return format!("Failed to create task, read the doc : {}", Self::schedule_help());
+          }
+        };
         let new_cron = NewCron {
             room: room_id,
             cron_expression: &cron_expression,
@@ -47,7 +52,7 @@ impl ScheduleClient {
         };
         new_cron.create();
         scheduler.start();
-        return "Task has been scheduled with successed".to_string();
+        return "Task has been scheduled successfully.".to_string();
     }
 
     async fn cron_job(room_id: &str, command: &str) {
@@ -74,6 +79,9 @@ impl ScheduleClient {
 
     fn list_room_crons(room_id: &str) -> String {
         let room_crons = DbCron::get_by_room_id(room_id);
+        if room_crons.is_empty() {
+            return format!("There is no Task created in this room \n Create your first task with this command to schedule every day of the week a command : \n `!schedule -c mon-fri !menu hopper`")
+        }
         let mut message = String::from("List of task of this room : \n");
         for cron in room_crons {
             let mut commands = cron.command.split_whitespace();
@@ -111,19 +119,23 @@ The `[day_pattern]` parameter uses a smart scheduling logic. You can use commas 
 * **Day Range (Hyphens)**: Use a hyphen to select a continuous block of days.
   * *Syntax:* `mon-fri` (Triggers every weekday from Monday through Friday)
 
-## Practical Examples
+## Examples
 
 ### 1. The Weekday Routine (Range)
-> `!schedule mon-fri !menu hopper`
+> `!schedule -c mon-fri !menu hopper`
 > Automatically triggers the `!menu hopper` command in the room every weekday (Monday through Friday) at 11:30 AM.
 
 ### 2. The Custom Selection (List)
-> `!schedule mon,tue,fri !yum pizza`
+> `!schedule -c mon,tue,fri !yum pizza`
 > Sends the yum command to the room only on Mondays, Tuesdays, and Fridays at 11:30 AM.
 
 ### 3. The Single Weekly Event (Single Day)
-> `!schedule thu !menu hopper`
+> `!schedule -c thu !menu hopper`
 > Triggers the menu command in the room every Thursday at 11:30 AM.
+
+### 4. List all tasks of this room
+> `!schedule -l`
+> List all tasks of this room
             ");
     }
 
