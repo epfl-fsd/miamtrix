@@ -2,7 +2,6 @@ use diesel::prelude::*;
 use crate::schema::crons;
 use crate::db::DbClient;
 use crate::schema::crons::dsl::*;
-use diesel:: prelude::*;
 
 #[derive(Queryable, Selectable, Debug)]
 #[diesel(table_name = crons)]

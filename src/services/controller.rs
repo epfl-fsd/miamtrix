@@ -1,14 +1,11 @@
 use matrix_sdk::{
-    Client,
-    Room, RoomState,
+    Room,
     ruma::{
         events::room::{
-        message::{OriginalSyncRoomMessageEvent, MessageType, RoomMessageEventContent},
-        },
-        RoomId,
+        message::RoomMessageEventContent,
+        }
     }
 };
-use tokio::process::Command;
 
 use super::list::list_restaurant;
 use super::menu::get_menu;
