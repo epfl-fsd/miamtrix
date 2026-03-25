@@ -73,10 +73,14 @@ impl ScheduleClient {
     }
 
     fn list_room_crons(room_id: &str) -> String {
-        let all_crons = DbCron::get_all();
-        let mut message = String::from("All crons : \n");
-        for cron in all_crons {
-            let _ = writeln!(message, " - **{}**", cron.command);
+        let room_crons = DbCron::get_by_room_id(room_id);
+        let mut message = String::from("List of task of this room : \n");
+        for cron in room_crons {
+            let mut commands = cron.command.split_whitespace();
+            let days = commands.next().unwrap_or("").to_lowercase();
+            let command: Vec<&str> = commands.by_ref().collect();
+            let _ = writeln!(message, " - Command : **{}**", command.join(" "));
+            let _ = writeln!(message, " Day(s) : **{}**", days);
         }
         message
     }
