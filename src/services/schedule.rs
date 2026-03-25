@@ -1,4 +1,5 @@
 use crate::models::crons::{NewCron, Cron as DbCron};
+use tokio::runtime::Handle;
 use std::fmt::Write;
 use chrono::Local;
 use cron_tab::Cron;
@@ -16,11 +17,12 @@ impl ScheduleClient {
 
         let room_id_closure = room_id.to_string();
         let command_closure = command.clone();
-        let cron_expression = format!("35 16 * * * {} *", cron);
+        let handle = Handle::current();
+        let cron_expression = format!("0 30 11 * * {} *", cron);
         let job_id = scheduler.add_fn(&cron_expression, move || {
             let r_id = room_id_closure.clone();
             let cmd = command_closure.clone();
-            tokio::spawn(async move {
+            handle.spawn(async move {
                 Self::cron_job(&r_id, &cmd).await;
             });
         }).expect("Failed to create new cron");
@@ -31,6 +33,7 @@ impl ScheduleClient {
             job_id: &job_id.to_string(),
         };
         let cron = new_cron.create();
+        scheduler.start();
         return "Create Cron".to_string();
     }
 
