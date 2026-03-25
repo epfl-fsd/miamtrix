@@ -129,7 +129,7 @@ The `[day_pattern]` parameter uses a smart scheduling logic. You can use commas 
 
     pub async fn controller_schedule(args: &str, room_id: &str) -> String {
         let mut iter = args.split_ascii_whitespace();
-        let mut response = "Explanation Schedule".to_string();
+        let mut response = "".to_string();
         while let Some(token) = iter.next() {
             match token {
                 "-c" => {
@@ -137,7 +137,7 @@ The `[day_pattern]` parameter uses a smart scheduling logic. You can use commas 
                     if !parts.is_empty() {
                         response = Self::create_cron(&parts.join(" "), room_id);
                     } else {
-                        response = "Create but no argument".to_string()
+                        response = Self::schedule_help()
                     }
                     break;
                 }
