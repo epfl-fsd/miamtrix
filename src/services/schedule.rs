@@ -101,13 +101,7 @@ impl ScheduleClient {
         };
         drop(scheduler);
         let job_id_str = job_id.to_string();
-        let new_cron = NewCron {
-            room: room_id,
-            cron_expression: &cron_expression,
-            command: command,
-            job_id: &job_id_str,
-        };
-        new_cron.create();
+        NewCron::create(&room_id, &cron_expression, &command, &job_id_str);
         "Task has been scheduled successfully.".to_string()
     }
 
@@ -132,12 +126,12 @@ impl ScheduleClient {
         }
         let mut message = String::from("List of task of this room : \n");
         for cron in room_crons {
-            let commands = cron.command;
             if let Some(days) = cron.cron_expression.split_whitespace().nth(5) {
-                let _ = writeln!(message, " - Command : **{}**", commands);
+                let _ = writeln!(message, " - Cron name : **{}**", cron.name );
+                let _ = writeln!(message, " Command : **{}**", cron.command);
                 let _ = writeln!(message, " Day(s) : **{}**", days);
             } else {
-                let _ = writeln!(message, " - Command : **{}**", commands);
+                let _ = writeln!(message, " - Command : **{}**", cron.command);
                 let _ = writeln!(message, " Day(s) : **Undefined day(s)**");
             }
 
@@ -149,45 +143,38 @@ impl ScheduleClient {
         "\
 ## Command Overview: `!schedule`
 
-The `!schedule` command allows you to automate bot commands to execute in the current room at exactly **11:30 AM**. By using flexible, cron-style formatting for the day parameter, you can create highly specific recurring schedules without needing to set up multiple identical commands.
+Automate bot commands to execute in the current room exactly at 11:30 AM.
 
-## Syntax
+USAGE:
+    !schedule <SUBCOMMAND> [OPTIONS]
 
-`!schedule [day_pattern] [<command>]`
+SUBCOMMANDS:
+    create              Create a new scheduled task.
+    -l, --list          List all scheduled tasks in the current room.
+    -h, --help          Print this help message.
 
-## Parameters
+OPTIONS FOR 'create':
+    -d, --date <DAYS>   Specify the day(s) to execute the command.
+    -j, --job <CMD>     The exact bot command to run.
 
-* **`[day_pattern]`**: The day or combination of days you want the command to execute. It accepts single days, lists, and ranges.
-* **`[<command>]`**: The exact bot command (including any of its own parameters) that you want to automate.
+DAY PATTERNS:
+    You can use cron-style formatting for the <DAYS> parameter:
+    * Single Day : mon, tue, wed, thu, fri, sat, sun
+    * List       : mon,wed,fri (Comma-separated, NO spaces)
+    * Range      : mon-fri     (Hyphen-separated)
 
-## Advanced Scheduling Options
+EXAMPLES:
+    1. The Weekday Routine (Range)
+       `!schedule create -d mon-fri -j !menu hopper`
 
-The `[day_pattern]` parameter uses a smart scheduling logic. You can use commas and hyphens to group days together, just like traditional cron jobs:
+    2. The Custom Selection (List)
+       `!schedule create -d mon,tue,fri -j !yum pizza`
 
-* **Single Day**: Use the standard 3-letter abbreviation for a single day.
-  * *Syntax:* `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`
-* **Specific List (Commas)**: Use a comma to select multiple, non-consecutive days. Do not include spaces between the days.
-  * *Syntax:* `mon,wed,fri` (Triggers on Mondays, Wednesdays, and Fridays)
-* **Day Range (Hyphens)**: Use a hyphen to select a continuous block of days.
-  * *Syntax:* `mon-fri` (Triggers every weekday from Monday through Friday)
+    3. The Single Weekly Event (Single Day)
+       `!schedule create -d thu -j !menu hopper`
 
-## Examples
-
-### 1. The Weekday Routine (Range)
-> `!schedule -c mon-fri !menu hopper`
-> Automatically triggers the `!menu hopper` command in the room every weekday (Monday through Friday) at 11:30 AM.
-
-### 2. The Custom Selection (List)
-> `!schedule -c mon,tue,fri !yum pizza`
-> Sends the yum command to the room only on Mondays, Tuesdays, and Fridays at 11:30 AM.
-
-### 3. The Single Weekly Event (Single Day)
-> `!schedule -c thu !menu hopper`
-> Triggers the menu command in the room every Thursday at 11:30 AM.
-
-### 4. List all tasks of this room
-> `!schedule -l`
-> List all tasks of this room
+    4. List all tasks of this room
+       `!schedule --list`
             "
     }
 
