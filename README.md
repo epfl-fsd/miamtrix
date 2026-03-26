@@ -12,6 +12,9 @@ Miamtrix is a Matrix bot that helps you check the daily menus at EPFL.
 
 ## Commands
 
+- `!schedule <SubCommand> [OPTIONS]`
+> Schedule a command with `create` Sub command or list all task of your room with `-l, --list` Sub command.
+
 - `!oslf`
 > Returns all menus that contain fries.
 
