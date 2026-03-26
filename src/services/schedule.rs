@@ -1,6 +1,7 @@
 use crate::models::crons::{NewCron, Cron as DbCron};
 use tokio::runtime::Handle;
 use std::fmt::Write;
+use std::sync::LazyLock;
 use chrono::Local;
 use cron_tab::Cron;
 use matrix_sdk::ruma::RoomId;
@@ -10,26 +11,73 @@ use regex::Regex;
 
 use super::controller::controller_command;
 
+static DAY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    let d = "mon|tue|wed|thu|fri|sat|sun";
+    let pattern = format!("^(?:{d})(?:,(?:{d}))*$|^(?:{d})-(?:{d})$");
+    Regex::new(&pattern).unwrap()
+});
+
 pub struct ScheduleClient;
 
 impl ScheduleClient {
     fn is_valid_schedule_day(input: &str) -> bool {
-        let d = "mon|tue|wed|thu|fri";
-        let pattern = format!("^(?:{d})(?:,(?:{d}))*$|^(?:{d})-(?:{d})$");
+        DAY_REGEX.is_match(input)
+    }
+    fn controller_create_cron(args: &str, room_id: &str) -> String {
+        //get cron si cron et get command obligatoire
+        let mut cron = None;
+        let mut job = None;
 
-        let re = Regex::new(&pattern).unwrap();
-        re.is_match(input)
+        let mut iter = args.split_whitespace().peekable();
+
+        while let Some(word) = iter.next() {
+            match word {
+                "-d" | "--date" => {
+                    if let Some(d) = iter.next() {
+                        if Self::is_valid_schedule_day(d) {
+                            cron = Some(d.to_string());
+                        } else {
+                            return "Error: Invalid day pattern. Please use a 3-letter day (e.g., mon), a list (mon,wed), or a range (mon-fri).\n Run !schedule --help or -h for more help".to_string()
+                        }
+
+                    } else {
+                        return "Error : Missing argument for `-d`. Example: `-d mon-fri`".to_string();
+                    }
+                }
+                "-j" | "--job" => {
+                    let mut job_parts = Vec::new();
+
+                    while let Some(&next_word) = iter.peek() {
+                        if next_word == "-d" || next_word == "--date" {
+                            break;
+                        }
+                        job_parts.push(iter.next().unwrap());
+                    }
+                    if job_parts.is_empty() {
+                        return format!("Error: missing command after `-j`");
+                    }
+                    job = Some(job_parts.join(" "));
+                }
+                _ => {
+                    return format!("Error: unknown argument: `{}` \n {}", word,  Self::schedule_help());
+                }
+            }
+        }
+        let final_cron = cron.unwrap_or_else(|| "mon-fri".to_string());
+
+        let final_job = match job {
+            Some(j) => j,
+            None => return format!("Error: The `-j` (job) flag is mandatory.\n{}", Self::schedule_help())
+        };
+
+        let response = Self::create_cron(&final_cron, &final_job, room_id);
+        return response;
     }
 
-    fn create_cron(args: &str, room_id: &str) -> String {
-        let (cron, command) = Self::get_cron_command(&args);
-
-        if !Self::is_valid_schedule_day(&cron) {
-            return "Error: Invalid day pattern. Please use a 3-letter day (e.g., mon), a list (mon,wed), or a range (mon-fri), sat and sun are not accepted.\n Run !schedule --help or -h for more help".to_string()
-        }
+    fn create_cron(cron: &str, command: &str, room_id: &str) -> String {
         let mut scheduler = Cron::new(Local);
         let room_id_closure = room_id.to_string();
-        let command_closure = command.clone();
+        let command_closure = command.to_string();
         let handle = Handle::current();
         let cron_expression = format!("0 30 11 * * {} *", cron);
         let job_id = match scheduler.add_fn(&cron_expression, move || {
@@ -47,7 +95,7 @@ impl ScheduleClient {
         let new_cron = NewCron {
             room: room_id,
             cron_expression: &cron_expression,
-            command: args,
+            command: command,
             job_id: &job_id.to_string(),
         };
         new_cron.create();
@@ -67,20 +115,10 @@ impl ScheduleClient {
         }
     }
 
-    fn get_cron_command(params: &str) -> (String, String) {
-        if params.is_empty() {
-            return ("".to_string(), "".to_string());
-        }
-        let mut parts = params.splitn(2, ' ');
-        let cron = parts.next().unwrap_or("").to_lowercase();
-        let command = parts.next().unwrap_or("").to_lowercase();
-        (cron, command)
-    }
-
     fn list_room_crons(room_id: &str) -> String {
         let room_crons = DbCron::get_by_room_id(room_id);
         if room_crons.is_empty() {
-            return format!("There is no Task created in this room \n Create your first task with this command to schedule every day of the week a command : \n `!schedule -c mon-fri !menu hopper`")
+            return "There is no Task created in this room \n Create your first task with this command to schedule every day of the week a command : \n `!schedule -c mon-fri !menu hopper`".to_string()
         }
         let mut message = String::from("List of task of this room : \n");
         for cron in room_crons {
@@ -93,8 +131,8 @@ impl ScheduleClient {
         message
     }
 
-    fn schedule_help() -> String {
-        return format!("\
+    fn schedule_help() -> &'static str {
+        "\
 ## Command Overview: `!schedule`
 
 The `!schedule` command allows you to automate bot commands to execute in the current room at exactly **11:30 AM**. By using flexible, cron-style formatting for the day parameter, you can create highly specific recurring schedules without needing to set up multiple identical commands.
@@ -136,7 +174,7 @@ The `[day_pattern]` parameter uses a smart scheduling logic. You can use commas 
 ### 4. List all tasks of this room
 > `!schedule -l`
 > List all tasks of this room
-            ");
+            "
     }
 
     pub async fn controller_schedule(args: &str, room_id: &str) -> String {
@@ -144,21 +182,21 @@ The `[day_pattern]` parameter uses a smart scheduling logic. You can use commas 
         let mut response = "".to_string();
         while let Some(token) = iter.next() {
             match token {
-                "-c" => {
+                "create" => {
                     let parts: Vec<&str> = iter.by_ref().collect();
                     if !parts.is_empty() {
-                        response = Self::create_cron(&parts.join(" "), room_id);
+                        response = Self::controller_create_cron(&parts.join(" "), room_id);
                     } else {
-                        response = Self::schedule_help()
+                        response = Self::schedule_help().to_string();
                     }
                     break;
                 }
-                "-l" => {
+                "-l" | "--list" => {
                     response = Self::list_room_crons(&room_id);
                     break;
                 }
                 _ => {
-                    response = Self::schedule_help();
+                    response = Self::schedule_help().to_string();
                     break;
                 }
             }
