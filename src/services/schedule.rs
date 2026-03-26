@@ -1,7 +1,7 @@
 use crate::models::crons::{NewCron, Cron as DbCron};
 use tokio::runtime::Handle;
 use std::fmt::Write;
-use std::sync::LazyLock;
+use std::sync::{LazyLock, Mutex};
 use chrono::Local;
 use cron_tab::Cron;
 use matrix_sdk::ruma::RoomId;
@@ -15,6 +15,12 @@ static DAY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     let d = "mon|tue|wed|thu|fri|sat|sun";
     let pattern = format!("^(?:{d})(?:,(?:{d}))*$|^(?:{d})-(?:{d})$");
     Regex::new(&pattern).unwrap()
+});
+
+static CRON_SCHEDULER: LazyLock<Mutex<Cron<Local>>> = LazyLock::new(|| {
+    let mut scheduler = Cron::new(Local);
+        scheduler.start();
+        Mutex::new(scheduler)
 });
 
 pub struct ScheduleClient;
@@ -52,6 +58,7 @@ impl ScheduleClient {
                             break;
                         }
                         job_parts.push(iter.next().unwrap());
+
                     }
                     if job_parts.is_empty() {
                         return format!("Error: missing command after `-j`");
@@ -70,16 +77,16 @@ impl ScheduleClient {
             None => return format!("Error: The `-j` (job) flag is mandatory.\n{}", Self::schedule_help())
         };
 
-        let response = Self::create_cron(&final_cron, &final_job, room_id);
-        return response;
+        Self::create_cron(&final_cron, &final_job, room_id)
     }
 
     fn create_cron(cron: &str, command: &str, room_id: &str) -> String {
-        let mut scheduler = Cron::new(Local);
         let room_id_closure = room_id.to_string();
         let command_closure = command.to_string();
         let handle = Handle::current();
         let cron_expression = format!("0 30 11 * * {} *", cron);
+        let mut scheduler = CRON_SCHEDULER.lock().unwrap();
+
         let job_id = match scheduler.add_fn(&cron_expression, move || {
             let r_id = room_id_closure.clone();
             let cmd = command_closure.clone();
@@ -92,20 +99,23 @@ impl ScheduleClient {
               return format!("Failed to create task, read the doc : {}", Self::schedule_help());
           }
         };
+        drop(scheduler);
+        let job_id_str = job_id.to_string();
         let new_cron = NewCron {
             room: room_id,
             cron_expression: &cron_expression,
             command: command,
-            job_id: &job_id.to_string(),
+            job_id: &job_id_str,
         };
         new_cron.create();
-        scheduler.start();
-        return "Task has been scheduled successfully.".to_string();
+        "Task has been scheduled successfully.".to_string()
     }
 
     async fn cron_job(room_id: &str, command: &str) {
-        let client = MATRIX_CLIENT.get().expect("Error, matrix client not initialised");
-
+        let Some(client) = MATRIX_CLIENT.get() else {
+            eprintln!("Error: Matrix client not initialised when cron triggered.");
+            return;
+        };
         let Ok(parsed_room_id) = RoomId::parse(room_id) else {
             eprintln!("Invalid room id : {}", room_id);
             return;
@@ -122,11 +132,15 @@ impl ScheduleClient {
         }
         let mut message = String::from("List of task of this room : \n");
         for cron in room_crons {
-            let mut commands = cron.command.split_whitespace();
-            let days = commands.next().unwrap_or("").to_lowercase();
-            let command: Vec<&str> = commands.by_ref().collect();
-            let _ = writeln!(message, " - Command : **{}**", command.join(" "));
-            let _ = writeln!(message, " Day(s) : **{}**", days);
+            let commands = cron.command;
+            if let Some(days) = cron.cron_expression.split_whitespace().nth(5) {
+                let _ = writeln!(message, " - Command : **{}**", commands);
+                let _ = writeln!(message, " Day(s) : **{}**", days);
+            } else {
+                let _ = writeln!(message, " - Command : **{}**", commands);
+                let _ = writeln!(message, " Day(s) : **Undefined day(s)**");
+            }
+
         }
         message
     }
@@ -179,28 +193,17 @@ The `[day_pattern]` parameter uses a smart scheduling logic. You can use commas 
 
     pub async fn controller_schedule(args: &str, room_id: &str) -> String {
         let mut iter = args.split_ascii_whitespace();
-        let mut response = "".to_string();
-        while let Some(token) = iter.next() {
-            match token {
-                "create" => {
-                    let parts: Vec<&str> = iter.by_ref().collect();
-                    if !parts.is_empty() {
-                        response = Self::controller_create_cron(&parts.join(" "), room_id);
-                    } else {
-                        response = Self::schedule_help().to_string();
-                    }
-                    break;
-                }
-                "-l" | "--list" => {
-                    response = Self::list_room_crons(&room_id);
-                    break;
-                }
-                _ => {
-                    response = Self::schedule_help().to_string();
-                    break;
+        match iter.next() {
+            Some("create") => {
+                let remaining_args = args.trim_start_matches("create").trim();
+                if !remaining_args.is_empty() {
+                    Self::controller_create_cron(remaining_args, room_id)
+                } else {
+                    Self::schedule_help().to_string()
                 }
             }
+            Some("-l" | "--list") => Self::list_room_crons(&room_id),
+            _ => Self::schedule_help().to_string(),
         }
-        response
     }
 }
