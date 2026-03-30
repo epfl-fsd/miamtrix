@@ -66,3 +66,6 @@ This project uses a Makefile to simplify development and versioning. You can run
 
 - `make version-patch`
 > Executes the versioning script (`./bump-version.sh`) to bump patch version.
+
+## Configuration As Code
+The configuration as code is made for openshift with Ansible playbook : [miamtrix's playbook](https://github.com/epfl-si/sopec/tree/feature/miamtrix)
