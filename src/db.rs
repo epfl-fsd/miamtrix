@@ -3,9 +3,11 @@ use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection}
 };
 use std::sync::OnceLock;
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 pub static DB_POOL: OnceLock<DbPool> = OnceLock::new();
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations/");
 
 pub struct DbClient;
 
@@ -18,6 +20,12 @@ impl DbClient {
             .expect("Failed to create db pool");
 
         let _ = DB_POOL.set(pool);
+
+        let mut conn = Self::get_connection();
+        println!("Running database migrations ...");
+        conn.run_pending_migrations(MIGRATIONS).unwrap();
+        println!("Migrations applied successfully");
+
     }
 
     pub fn get_connection() -> PooledConnection<ConnectionManager<PgConnection>> {
