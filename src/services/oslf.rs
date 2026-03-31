@@ -8,7 +8,22 @@ use crate::utils::{
     message::message
 };
 
-pub async fn get_fries() -> String {
+pub async fn get_fries(args: &str) -> String {
+    let mut city = "".to_string();
+    let mut iter = args.split_whitespace();
+
+    while let Some(word) = iter.next() {
+        match word {
+            "-c" | "--city" => {
+                if let Some(d) = iter.next() {
+                    city = d.to_string();
+                }
+            }
+            _ => {
+                break;
+            }
+        }
+    }
     let response = match ApiClient::get().await {
       Ok(resp) => resp,
       Err(_) => return "Error, could not reach the restaurant API.".to_string(),
@@ -23,10 +38,11 @@ pub async fn get_fries() -> String {
 
     let search = ["fries", "frite"];
     dishes.retain(|d| {
+        let location = d.location.to_lowercase();
         let name = d.name.to_lowercase();
         let r#type = d.menu_type.to_lowercase();
         search.iter().any(|&term| {
-            name.contains(term) || r#type.contains(term)
+            (name.contains(term) || r#type.contains(term)) && location.contains(&city)
         })
     });
     message(dishes)
