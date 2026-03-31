@@ -1,4 +1,5 @@
 use crate::utils::api::ApiClient;
+use deunicode::deunicode;
 use crate::models::{
     cafeteria::Cafeteria,
     dish::Dish,
@@ -8,15 +9,36 @@ use crate::utils::{
     message::message
 };
 
-pub async fn get_restaurant(food_type: &str) -> String {
-    let search = food_type.trim().to_lowercase();
-    if search.is_empty() {
-        return "Please specify what you want to eat (or avoid)!\n✅ Include: !yum [food] (e.g., !yum pizza)\n❌ Exclude: !yum ![food] (e.g., !yum !fish)\n".to_string();
-    };
+pub async fn get_restaurant(args: &str) -> String {
+    let mut search = String::new();
+    let mut city = String::new();
+    let mut allergen = String::new();
+    let mut iter = args.split_whitespace();
 
-    let (query, alergen) = match search.split_once("-a") {
-        Some((q, f)) => (q.trim(), Some(f.trim())),
-        None => (search.as_str(), None),
+    while let Some(word) = iter.next() {
+        match word {
+            "-c" | "--city" => {
+                if let Some(d) = iter.next() {
+                    city = d.to_string();
+                }
+            }
+            "-s" | "--search" => {
+                if let Some(d) = iter.next() {
+                    search = d.to_string()
+                }
+            }
+            "-a" | "--allergen" => {
+                if let Some(d) = iter.next() {
+                    allergen = d.to_string()
+                }
+            }
+            _ => {
+                continue;
+            }
+        }
+    }
+    if search.is_empty() {
+        return "Please specify what you want to eat (or avoid)!\n✅ Include: !yum -s [food] (e.g., !yum -s pizza)\n❌ Exclude: !yum -s ![food] (e.g., !yum -s !fish)\n".to_string();
     };
 
     let response = match ApiClient::get().await {
@@ -31,17 +53,27 @@ pub async fn get_restaurant(food_type: &str) -> String {
 
     let mut dishes: Vec<Dish> = filter_menu(cafeterias);
 
-    let (is_exclusion, term) = if query.starts_with('!') {
-        (true, &query[1..])
+    let (is_exclusion, term) = if search.starts_with('!') {
+        (true, &search[1..])
     } else {
-        (false, query)
+        (false, search.as_str())
     };
 
+    let term_lower = term.to_lowercase();
+    let allergen_lower = allergen.to_lowercase();
+    let city_normalized = deunicode(&city).to_lowercase();
     dishes.retain(|d| {
-        if let Some(a) = alergen {
+
+        if !city.is_empty() {
+            let location = deunicode(&d.location).to_lowercase();
+            if location != city_normalized {
+                return false;
+            }
+        }
+        if !allergen.is_empty() {
             let contains_alergen = d.alergen.iter().any(|al| {
                 let al_lower = al.to_lowercase();
-                al_lower.contains(a) || al_lower == "alergen not specified"
+                al_lower.contains(&allergen_lower) || al_lower == "alergen not specified"
             });
             if contains_alergen {
                 return false;
@@ -51,9 +83,9 @@ pub async fn get_restaurant(food_type: &str) -> String {
         let restaurant = d.restaurant.to_lowercase();
         let r#type = d.menu_type.to_lowercase();
 
-        let contains_term = name.contains(term)
-            ||r#type.contains(term)
-            || restaurant.contains(term);
+        let contains_term = name.contains(&term_lower)
+            ||r#type.contains(&term_lower)
+            || restaurant.contains(&term_lower);
 
         if is_exclusion {
             !contains_term
