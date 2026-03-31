@@ -26,10 +26,9 @@ impl ApiClient {
     }
     pub async fn get() -> Result<reqwest::Response, reqwest::Error> {
         let api = API.get().expect("Client api not initialised.");
-        let date = Local::now().format("%Y-%m-%d").to_string();
-        println!("{}",date);
+        let date_fmt = Local::now().format("%Y-%m-%d");
         api.client
-            .get(format!("{}?date={}", api.base_url, date))
+            .get(format!("{}?date={}", api.base_url, date_fmt))
             .basic_auth(&api.api_username, Some(&api.api_password))
             .send()
             .await
