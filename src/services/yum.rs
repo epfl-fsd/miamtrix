@@ -10,36 +10,36 @@ use crate::utils::{
 };
 
 pub async fn get_restaurant(args: &str) -> String {
-    let mut search = String::new();
-    let mut city = String::new();
-    let mut allergen = String::new();
+    let mut search: Option<&str> = None;
+    let mut city: Option<&str> = None;
+    let mut allergen: Option<&str> = None;
+
     let mut iter = args.split_whitespace();
 
     while let Some(word) = iter.next() {
         match word {
-            "-c" | "--city" => {
-                if let Some(d) = iter.next() {
-                    city = d.to_string();
-                }
-            }
-            "-s" | "--search" => {
-                if let Some(d) = iter.next() {
-                    search = d.to_string()
-                }
-            }
-            "-a" | "--allergen" => {
-                if let Some(d) = iter.next() {
-                    allergen = d.to_string()
-                }
-            }
+            "-c" | "--city" => city = iter.next(),
+            "-s" | "--search" => search = iter.next(),
+            "-a" | "--allergen" => allergen = iter.next(),
             _ => {
                 continue;
             }
         }
     }
-    if search.is_empty() {
-        return "Please specify what you want to eat (or avoid)!\n✅ Include: !yum -s [food] (e.g., !yum -s pizza)\n❌ Exclude: !yum -s ![food] (e.g., !yum -s !fish)\n".to_string();
+    let search_term = match search {
+        Some(s) if !s.is_empty() => s,
+        _ => return "Please specify what you want to eat (or avoid)!\n✅ Include: !yum -s [food] (e.g., !yum -s pizza)\n❌ Exclude: !yum -s ![food] (e.g., !yum -s !fish)\n".to_string(),
     };
+
+    let (is_exclusion, term) = if let Some(stripped) = search_term.strip_prefix('!') {
+        (true, stripped)
+    } else {
+        (false, search_term)
+    };
+
+    let term_lower = term.to_lowercase();
+    let target_allergen = allergen.map(|a| a.to_lowercase());
+    let target_city = city.map(|c| deunicode(c).to_lowercase());
 
     let response = match ApiClient::get().await {
       Ok(resp) => resp,
@@ -53,39 +53,27 @@ pub async fn get_restaurant(args: &str) -> String {
 
     let mut dishes: Vec<Dish> = filter_menu(cafeterias);
 
-    let (is_exclusion, term) = if search.starts_with('!') {
-        (true, &search[1..])
-    } else {
-        (false, search.as_str())
-    };
 
-    let term_lower = term.to_lowercase();
-    let allergen_lower = allergen.to_lowercase();
-    let city_normalized = deunicode(&city).to_lowercase();
     dishes.retain(|d| {
-
-        if !city.is_empty() {
-            let location = deunicode(&d.location).to_lowercase();
-            if location != city_normalized {
+        if let Some(ref c) = target_city {
+            if deunicode(&d.location).to_lowercase() != *c {
                 return false;
             }
         }
-        if !allergen.is_empty() {
+        if let Some(ref a) = target_allergen {
             let contains_alergen = d.alergen.iter().any(|al| {
-                let al_lower = al.to_lowercase();
-                al_lower.contains(&allergen_lower) || al_lower == "alergen not specified"
+                if al == "alergen not specified" {
+                    return true;
+                }
+                al.to_lowercase().contains(a)
             });
             if contains_alergen {
                 return false;
             }
         }
-        let name = d.name.to_lowercase();
-        let restaurant = d.restaurant.to_lowercase();
-        let r#type = d.menu_type.to_lowercase();
-
-        let contains_term = name.contains(&term_lower)
-            ||r#type.contains(&term_lower)
-            || restaurant.contains(&term_lower);
+        let contains_term = d.name.to_lowercase().contains(&term_lower)
+            ||d.menu_type.to_lowercase().contains(&term_lower)
+            || d.restaurant.to_lowercase().contains(&term_lower);
 
         if is_exclusion {
             !contains_term
