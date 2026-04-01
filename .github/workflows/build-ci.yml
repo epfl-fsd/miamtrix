@@ -1,0 +1,40 @@
+name: Build image at new release
+
+on:
+  release:
+    types: released
+
+env:
+  REGISTRY_PATH: 'quay-its.epfl.ch/svc0176/miamtrix'
+
+jobs:
+  build-image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: login quay
+        run: echo ${{ secrets.quay_password }} | docker login -u ${{ secrets.quay_bot_user }} --password-stdin quay-its.epfl.ch
+
+      - name: Get version from Cargo.toml
+        id: version
+        run: |
+          EXTRACTED_VERSION=$(grep -m 1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+
+          if [ -z "$EXTRACTED_VERSION" ]; then
+            echo "Erreur : Impossible de trouver la version dans Cargo.toml"
+            exit 1
+          fi
+          echo "version=$EXTRACTED_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: build image
+        run: |
+            docker build -t ${{ env.REGISTRY_PATH }}:latest .
+            docker build -t ${{ env.REGISTRY_PATH }}:${{ steps.version.outputs.version }} .
+
+      - name: push image on quay
+        run: |
+            docker push ${{ env.REGISTRY_PATH }}:latest
+            docker push ${{ env.REGISTRY_PATH }}:${{ steps.version.outputs.version }}
