@@ -1,12 +1,11 @@
 use crate::models::crons::{NewCron, Cron as DbCron};
 use tokio::runtime::Handle;
 use std::fmt::Write;
-use std::sync::{LazyLock, Mutex};
-use chrono::Local;
-use cron_tab::Cron;
+use std::sync::LazyLock;
 use matrix_sdk::ruma::RoomId;
 use crate::MATRIX_CLIENT;
 use regex::Regex;
+use crate::CRON_SCHEDULER;
 
 
 use super::controller::controller_command;
@@ -21,11 +20,6 @@ static HOUR_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&pattern).unwrap()
 });
 
-static CRON_SCHEDULER: LazyLock<Mutex<Cron<Local>>> = LazyLock::new(|| {
-    let mut scheduler = Cron::new(Local);
-        scheduler.start();
-        Mutex::new(scheduler)
-});
 
 pub struct ScheduleClient;
 
@@ -119,18 +113,18 @@ impl ScheduleClient {
                 Self::cron_job(&r_id, &cmd).await;
             });
         }) {
-          Ok(id) => id,
+          Ok(id) => id.to_string(),
           Err(_) => {
               return format!("Failed to create task, read the doc : {}", Self::schedule_help());
           }
         };
         drop(scheduler);
-        let job_id_str = job_id.to_string();
-        NewCron::create(&room_id, &cron_expression, &command, &job_id_str);
+        let job_id_str = job_id;
+        NewCron::create(&room_id, &cron_expression, &command, &job_id_str, &hour);
         "Task has been scheduled successfully.".to_string()
     }
 
-    async fn cron_job(room_id: &str, command: &str) {
+    pub async fn cron_job(room_id: &str, command: &str) {
         let Some(client) = MATRIX_CLIENT.get() else {
             eprintln!("Error: Matrix client not initialised when cron triggered.");
             return;
@@ -155,9 +149,11 @@ impl ScheduleClient {
                 let _ = writeln!(message, " - Cron name : **{}**", cron.name );
                 let _ = writeln!(message, " Command : **{}**", cron.command);
                 let _ = writeln!(message, " Day(s) : **{}**", days);
+                let _ = writeln!(message, " Hour : **{}**", cron.hour);
             } else {
                 let _ = writeln!(message, " - Command : **{}**", cron.command);
                 let _ = writeln!(message, " Day(s) : **Undefined day(s)**");
+                let _ = writeln!(message, " Hour : **{}**", cron.hour);
             }
 
         }

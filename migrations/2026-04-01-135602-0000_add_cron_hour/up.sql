@@ -1,0 +1,6 @@
+-- Your SQL goes here
+ALTER TABLE crons ADD COLUMN hour VARCHAR;
+
+UPDATE crons SET hour = '00:00' WHERE hour IS NULL;
+
+ALTER TABLE crons ALTER COLUMN hour SET NOT NULL;
