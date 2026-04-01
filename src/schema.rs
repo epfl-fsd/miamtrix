@@ -8,5 +8,6 @@ diesel::table! {
         cron_expression -> Varchar,
         command -> Varchar,
         job_id -> Varchar,
+        hour -> Varchar,
     }
 }

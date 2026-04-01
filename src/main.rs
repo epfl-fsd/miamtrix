@@ -10,8 +10,12 @@ use matrix_sdk::{
         message::{MessageType, OriginalSyncRoomMessageEvent},
     },
 };
+use tokio::runtime::Handle;
 use tokio::time::{Duration, sleep};
 use std::sync::OnceLock;
+use std::sync::{LazyLock, Mutex};
+use chrono::Local;
+use cron_tab::Cron as Cron_tab;
 
 mod config;
 mod services;
@@ -24,7 +28,14 @@ use crate::db::DbClient;
 use crate::utils::api::ApiClient;
 use crate::services::controller::controller_command;
 use crate::config::{AppConfig, CONFIG};
+use crate::services::schedule::ScheduleClient;
+
 pub static MATRIX_CLIENT: OnceLock<Client> = OnceLock::new();
+pub static CRON_SCHEDULER: LazyLock<Mutex<Cron_tab<Local>>> = LazyLock::new(|| {
+    let mut scheduler = Cron_tab::new(Local);
+        scheduler.start();
+        Mutex::new(scheduler)
+});
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -39,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
     CONFIG.set(config_app).expect("Config already init");
     ApiClient::init();
     DbClient::init(&db_url);
-
+    recreate_all_cron();
     login_and_sync(url, &user, &pass).await?;
 
     Ok(())
@@ -114,4 +125,29 @@ async fn message_listener(ev: OriginalSyncRoomMessageEvent, room: Room) {
 
     let commande_line = text_content.body.trim();
     controller_command(&commande_line, room).await;
+}
+
+fn recreate_all_cron() {
+    let all_crons = models::crons::Cron::get_all();
+    let mut scheduler = CRON_SCHEDULER.lock().unwrap();
+    let handle = Handle::current();
+    for mut cron in all_crons {
+        let handle_clone = handle.clone();
+        let room_id = cron.room.clone();
+        let command = cron.command.clone();
+        let job_id = match scheduler.add_fn(&cron.cron_expression, move || {
+            let r_id = room_id.clone();
+            let cmd = command.clone();
+            handle_clone.spawn(async move {
+                ScheduleClient::cron_job(&r_id, &cmd).await;
+            });
+        }) {
+          Ok(id) => id.to_string(),
+          Err(_) => {
+              "impossible to create task".to_string()
+          }
+        };
+        cron.job_id = job_id;
+        models::crons::Cron::update_cron(&cron, cron.id);
+    }
 }

@@ -7,7 +7,7 @@ use crate::db::DbClient;
 use crate::schema::crons::dsl::*;
 use petname::petname;
 
-#[derive(Queryable, Selectable, Debug)]
+#[derive(Queryable, Selectable, Debug, AsChangeset)]
 #[diesel(table_name = crons)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Cron {
@@ -15,6 +15,7 @@ pub struct Cron {
     pub name: String,
     pub room: String,
     pub cron_expression: String,
+    pub hour: String,
     pub command: String,
     pub job_id: String,
 }
@@ -25,6 +26,7 @@ pub struct NewCron<'a> {
     pub name: &'a str,
     pub room: &'a str,
     pub cron_expression: &'a str,
+    pub hour: &'a str,
     pub command: &'a str,
     pub job_id: &'a str
 }
@@ -35,6 +37,7 @@ impl<'a> NewCron<'a> {
         target_cron: &'a str,
         target_command: &'a str,
         target_job_id: &'a str,
+        target_hour: &'a str,
     ) -> Cron {
         let mut conn = DbClient::get_connection();
 
@@ -47,6 +50,7 @@ impl<'a> NewCron<'a> {
                 cron_expression: &target_cron,
                 command: &target_command,
                 job_id: &target_job_id,
+                hour: &target_hour
             };
 
             match diesel::insert_into(crons)
@@ -91,6 +95,18 @@ impl Cron {
             return true;
         }
         false
+    }
+    pub fn update_cron(cron: &Cron, cron_id: i32) -> bool {
+        let mut conn = DbClient::get_connection();
+        let updated_cron = diesel::update(crons.filter(id.eq(cron_id)))
+            .set(cron)
+            .execute(&mut conn);
+
+        match updated_cron {
+            Ok(rows_affected) => rows_affected > 0,
+            Err(_) => false,
+        }
+
     }
     pub fn get_by_room_id(target_room_id: &str) -> Vec<Cron> {
         use crate::schema::crons::dsl::*;

@@ -1,12 +1,11 @@
 use crate::models::crons::{NewCron, Cron as DbCron};
 use tokio::runtime::Handle;
 use std::fmt::Write;
-use std::sync::{LazyLock, Mutex};
-use chrono::Local;
-use cron_tab::Cron;
+use std::sync::LazyLock;
 use matrix_sdk::ruma::RoomId;
 use crate::MATRIX_CLIENT;
 use regex::Regex;
+use crate::CRON_SCHEDULER;
 
 
 use super::controller::controller_command;
@@ -16,12 +15,11 @@ static DAY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     let pattern = format!("^(?:{d})(?:,(?:{d}))*$|^(?:{d})-(?:{d})$");
     Regex::new(&pattern).unwrap()
 });
-
-static CRON_SCHEDULER: LazyLock<Mutex<Cron<Local>>> = LazyLock::new(|| {
-    let mut scheduler = Cron::new(Local);
-        scheduler.start();
-        Mutex::new(scheduler)
+static HOUR_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    let pattern = format!("^([01][0-9]|2[0-3]):([0-5][0-9])$");
+    Regex::new(&pattern).unwrap()
 });
+
 
 pub struct ScheduleClient;
 
@@ -29,10 +27,19 @@ impl ScheduleClient {
     fn is_valid_schedule_day(input: &str) -> bool {
         DAY_REGEX.is_match(input)
     }
+    fn is_valide_schedule_hour(input: &str) -> bool {
+        HOUR_REGEX.is_match(input)
+    }
+    fn get_hour_minute(input: &str) -> (String, String) {
+        let mut hours = input.split(":");
+        let hour = hours.next().unwrap_or("").to_lowercase();
+        let minutes = hours.next().unwrap_or("").to_lowercase();
+        (hour, minutes)
+    }
     fn controller_create_cron(args: &str, room_id: &str) -> String {
-        //get cron si cron et get command obligatoire
         let mut cron = None;
         let mut job = None;
+        let mut hour = None;
 
         let mut iter = args.split_whitespace().peekable();
 
@@ -54,16 +61,27 @@ impl ScheduleClient {
                     let mut job_parts = Vec::new();
 
                     while let Some(&next_word) = iter.peek() {
-                        if next_word == "-d" || next_word == "--date" {
+                        if next_word == "-d" || next_word == "--date" || next_word == "-h" || next_word == "--hour" {
                             break;
                         }
                         job_parts.push(iter.next().unwrap());
 
                     }
                     if job_parts.is_empty() {
-                        return format!("Error: missing command after `-j`");
+                        return format!("Error: missing argument after `-j | --job`");
                     }
                     job = Some(job_parts.join(" "));
+                }
+                "-h" | "--hour" => {
+                    if let Some(h) = iter.next() {
+                        if Self::is_valide_schedule_hour(h) {
+                            hour = Some(h.to_string());
+                        } else {
+                            return "Error: Invalid hour format. Please use this format HH:mm (e.g., 11:45).\n Run !schedule --help for more help".to_string()
+                        }
+                    } else {
+                        return "Error : Missing argument for `-h` | `--hour`. Example: `-h 11:30`".to_string();
+                    }
                 }
                 _ => {
                     return format!("Error: unknown argument: `{}` \n {}", word,  Self::schedule_help());
@@ -71,20 +89,21 @@ impl ScheduleClient {
             }
         }
         let final_cron = cron.unwrap_or_else(|| "mon-fri".to_string());
-
+        let final_hour = hour.unwrap_or_else(|| "11:30".to_string());
         let final_job = match job {
             Some(j) => j,
             None => return format!("Error: The `-j` (job) flag is mandatory.\n{}", Self::schedule_help())
         };
 
-        Self::create_cron(&final_cron, &final_job, room_id)
+        Self::create_cron(&final_hour, &final_cron, &final_job, room_id)
     }
 
-    fn create_cron(cron: &str, command: &str, room_id: &str) -> String {
+    fn create_cron(hour: &str, cron: &str, command: &str, room_id: &str) -> String {
         let room_id_closure = room_id.to_string();
         let command_closure = command.to_string();
         let handle = Handle::current();
-        let cron_expression = format!("0 30 11 * * {} *", cron);
+        let (hour, minutes) = Self::get_hour_minute(&hour);
+        let cron_expression = format!("0 {} {} * * {} *", minutes, hour, cron);
         let mut scheduler = CRON_SCHEDULER.lock().unwrap();
 
         let job_id = match scheduler.add_fn(&cron_expression, move || {
@@ -94,18 +113,18 @@ impl ScheduleClient {
                 Self::cron_job(&r_id, &cmd).await;
             });
         }) {
-          Ok(id) => id,
+          Ok(id) => id.to_string(),
           Err(_) => {
               return format!("Failed to create task, read the doc : {}", Self::schedule_help());
           }
         };
         drop(scheduler);
-        let job_id_str = job_id.to_string();
-        NewCron::create(&room_id, &cron_expression, &command, &job_id_str);
+        let job_id_str = job_id;
+        NewCron::create(&room_id, &cron_expression, &command, &job_id_str, &hour);
         "Task has been scheduled successfully.".to_string()
     }
 
-    async fn cron_job(room_id: &str, command: &str) {
+    pub async fn cron_job(room_id: &str, command: &str) {
         let Some(client) = MATRIX_CLIENT.get() else {
             eprintln!("Error: Matrix client not initialised when cron triggered.");
             return;
@@ -130,9 +149,11 @@ impl ScheduleClient {
                 let _ = writeln!(message, " - Cron name : **{}**", cron.name );
                 let _ = writeln!(message, " Command : **{}**", cron.command);
                 let _ = writeln!(message, " Day(s) : **{}**", days);
+                let _ = writeln!(message, " Hour : **{}**", cron.hour);
             } else {
                 let _ = writeln!(message, " - Command : **{}**", cron.command);
                 let _ = writeln!(message, " Day(s) : **Undefined day(s)**");
+                let _ = writeln!(message, " Hour : **{}**", cron.hour);
             }
 
         }
@@ -154,8 +175,9 @@ SUBCOMMANDS:
     -h, --help          Print this help message.
 
 OPTIONS FOR 'create':
-    -d, --date <DAYS>   Specify the day(s) to execute the command.
+    -d, --date <DAYS>   Specify the day(s) to execute the command, mon-fri by default.
     -j, --job <CMD>     The exact bot command to run.
+    -h, --hour <HOUR>   Specify the hour to execute the command, 11:30 by default.
 
 DAY PATTERNS:
     You can use cron-style formatting for the <DAYS> parameter:
