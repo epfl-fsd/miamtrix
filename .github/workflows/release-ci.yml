@@ -23,7 +23,7 @@ jobs:
         uses: rabbitson87/get-cargo-package-info@v1
 
       - name: build image
-        run: docker build -t ${{ env.REGISTRY_PATH }}:{{ steps.version.outputs.version }} .
+        run: docker build -t ${{ env.REGISTRY_PATH }}:${{ steps.version.outputs.version }} .
 
       - name: push image on quay
         run: |
