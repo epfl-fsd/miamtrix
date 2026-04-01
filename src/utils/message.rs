@@ -3,7 +3,8 @@ use std::fmt::Write;
 use std::collections::BTreeMap;
 
 pub fn message(dishes: Vec<Dish>) -> String {
-    let mut message = String::from("# Daily menu :\n\n");
+    let mut message = String::with_capacity(dishes.len() * 120 + 50);
+    message.push_str("# Daily menu :\n\n");
     let mut grouped_data: BTreeMap<String, BTreeMap<String, Vec<Dish>>> = BTreeMap::new();
 
     for dish in dishes {

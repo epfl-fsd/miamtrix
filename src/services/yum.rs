@@ -1,4 +1,5 @@
 use crate::utils::api::ApiClient;
+use deunicode::deunicode;
 use crate::models::{
     cafeteria::Cafeteria,
     dish::Dish,
@@ -8,52 +9,71 @@ use crate::utils::{
     message::message
 };
 
-pub async fn get_restaurant(food_type: &str) -> String {
-    let search = food_type.trim().to_lowercase();
-    if search.is_empty() {
-        return "Please specify what you want to eat (or avoid)!\n✅ Include: !yum [food] (e.g., !yum pizza)\n❌ Exclude: !yum ![food] (e.g., !yum !fish)\n".to_string();
+pub async fn get_restaurant(args: &str) -> String {
+    let mut search: Option<&str> = None;
+    let mut city: Option<&str> = None;
+    let mut allergen: Option<&str> = None;
+
+    let mut iter = args.split_whitespace();
+
+    while let Some(word) = iter.next() {
+        match word {
+            "-c" | "--city" => city = iter.next(),
+            "-s" | "--search" => search = iter.next(),
+            "-a" | "--allergen" => allergen = iter.next(),
+            _ => {
+                continue;
+            }
+        }
+    }
+    let search_term = match search {
+        Some(s) if !s.is_empty() => s,
+        _ => return "Please specify what you want to eat (or avoid)!\n✅ Include: !yum -s [food] (e.g., !yum -s pizza)\n❌ Exclude: !yum -s ![food] (e.g., !yum -s !fish)\n".to_string(),
     };
 
-    let (query, alergen) = match search.split_once("-a") {
-        Some((q, f)) => (q.trim(), Some(f.trim())),
-        None => (search.as_str(), None),
+    let (is_exclusion, term) = if let Some(stripped) = search_term.strip_prefix('!') {
+        (true, stripped)
+    } else {
+        (false, search_term)
     };
 
-    let response = match ApiClient::get().await {
-      Ok(resp) => resp,
-      Err(_) => return "Error, could not reach the restaurant API.".to_string(),
-    };
+    let term_lower = term.to_lowercase();
+    let target_allergen = allergen.map(|a| a.to_lowercase());
+    let target_city = city.map(|c| deunicode(c).to_lowercase());
 
-    let cafeterias: Vec<Cafeteria> = match response.json().await {
+    let response = ApiClient::get().await.unwrap();
+    let raw_bytes = match response.bytes().await {
+        Ok(b) => b,
+        Err(_) => return "Error, Failed to load menu data".to_string(),
+    };
+    let cafeterias: Vec<Cafeteria> = match serde_json::from_slice(&raw_bytes) {
         Ok(data) => data,
-        Err(_) => return "Error, Failed to load menus data".to_string(),
+        Err(_) => return "Error, Failed to parse menus data".to_string(),
     };
 
     let mut dishes: Vec<Dish> = filter_menu(cafeterias);
 
-    let (is_exclusion, term) = if query.starts_with('!') {
-        (true, &query[1..])
-    } else {
-        (false, query)
-    };
 
     dishes.retain(|d| {
-        if let Some(a) = alergen {
+        if let Some(ref c) = target_city {
+            if deunicode(&d.location).to_lowercase() != *c {
+                return false;
+            }
+        }
+        if let Some(ref a) = target_allergen {
             let contains_alergen = d.alergen.iter().any(|al| {
-                let al_lower = al.to_lowercase();
-                al_lower.contains(a) || al_lower == "alergen not specified"
+                if al == "alergen not specified" {
+                    return true;
+                }
+                al.to_lowercase().contains(a)
             });
             if contains_alergen {
                 return false;
             }
         }
-        let name = d.name.to_lowercase();
-        let restaurant = d.restaurant.to_lowercase();
-        let r#type = d.menu_type.to_lowercase();
-
-        let contains_term = name.contains(term)
-            ||r#type.contains(term)
-            || restaurant.contains(term);
+        let contains_term = d.name.to_lowercase().contains(&term_lower)
+            ||d.menu_type.to_lowercase().contains(&term_lower)
+            || d.restaurant.to_lowercase().contains(&term_lower);
 
         if is_exclusion {
             !contains_term

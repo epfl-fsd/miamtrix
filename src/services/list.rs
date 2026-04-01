@@ -4,8 +4,20 @@ use crate::models::cafeteria::Cafeteria;
 use crate::utils::filter_menu::filter_menu;
 use std::fmt::Write;
 use std::collections::BTreeMap;
+use deunicode::deunicode;
 
-pub async fn list_restaurant() -> String {
+pub async fn list_restaurant(args: &str) -> String {
+    let mut city: Option<&str> = None;
+    let mut iter = args.split_whitespace();
+
+    while let Some(word) = iter.next() {
+        match word {
+            "-c" | "--city" => city = iter.next(),
+            _ => {
+                continue;
+            }
+        }
+    }
     let response = ApiClient::get().await.unwrap();
     let cafeterias: Vec<Cafeteria> = response.json().await.unwrap();
     let dishes: Vec<Dish> = filter_menu(cafeterias);
@@ -22,13 +34,23 @@ pub async fn list_restaurant() -> String {
             .or_default()
             .push(dish);
     }
+    let search_city = city.map(|c| deunicode(c).to_lowercase());
+    let mut message = String::with_capacity(500);
     let _ = writeln!(message, "### Restaurant list :\n");
-    for (location, restaurant) in grouped_data {
+    for (location, restaurants) in grouped_data {
+        if let Some(ref target_city) = search_city {
+            if deunicode(&location).to_lowercase() != *target_city {
+                continue;
+            }
+        }
         let _ = writeln!(message, "### {}", location);
-        for (restaurant, _dishes) in restaurant {
-            let _ = writeln!(message, " - {}", restaurant);
+        for restaurant in restaurants {
+            let _ = writeln!(message, " - {}", restaurant.0);
         }
         let _ = writeln!(message, "---\n");
+    }
+    if message.len() < 30 {
+        return "No restaurants found for this location.".to_string();
     }
     message
 }

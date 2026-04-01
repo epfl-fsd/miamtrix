@@ -34,11 +34,11 @@ pub async fn controller_command(commande_line: &str, room: Room) {
             room.send(set_message(&menu)).await.unwrap();
         }
         "!oslf" => {
-            let fries = get_fries().await;
+            let fries = get_fries(&args.trim()).await;
             room.send(set_message(&fries)).await.unwrap();
         }
         "!list" => {
-            let list = list_restaurant().await;
+            let list = list_restaurant(&args.trim()).await;
             room.send(set_message(&list)).await.unwrap();
         }
         "!help" => {
