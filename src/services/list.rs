@@ -21,7 +21,6 @@ pub async fn list_restaurant(args: &str) -> String {
     let response = ApiClient::get().await.unwrap();
     let cafeterias: Vec<Cafeteria> = response.json().await.unwrap();
     let dishes: Vec<Dish> = filter_menu(cafeterias);
-    let mut message = String::new();
     let mut grouped_data: BTreeMap<String, BTreeMap<String, Vec<Dish>>> = BTreeMap::new();
 
     for dish in dishes {
