@@ -24,14 +24,14 @@ pub async fn get_fries(args: &str) -> String {
             }
         }
     }
-    let response = match ApiClient::get().await {
-      Ok(resp) => resp,
-      Err(_) => return "Error, could not reach the restaurant API.".to_string(),
+    let response = ApiClient::get().await.unwrap();
+    let raw_bytes = match response.bytes().await {
+        Ok(b) => b,
+        Err(_) => return "Error, Failed to load menu data".to_string(),
     };
-
-    let cafeterias: Vec<Cafeteria> = match response.json().await {
+    let cafeterias: Vec<Cafeteria> = match serde_json::from_slice(&raw_bytes) {
         Ok(data) => data,
-        Err(_) => return "Error, Failed to load menus data".to_string(),
+        Err(_) => return "Error, Failed to parse menus data".to_string(),
     };
 
     let mut dishes: Vec<Dish> = filter_menu(cafeterias);

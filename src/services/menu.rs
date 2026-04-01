@@ -11,7 +11,14 @@ use crate::utils::{
 
 pub async fn get_menu(command: &str) -> String {
     let response = ApiClient::get().await.unwrap();
-    let cafeterias: Vec<Cafeteria> = response.json().await.unwrap();
+    let raw_bytes = match response.bytes().await {
+        Ok(b) => b,
+        Err(_) => return "Error, Failed to load menu data".to_string(),
+    };
+    let cafeterias: Vec<Cafeteria> = match serde_json::from_slice(&raw_bytes) {
+        Ok(data) => data,
+        Err(_) => return "Error, Failed to parse menus data".to_string(),
+    };
     if command.is_empty() {
         let mut message = format!("Please put a restaurant in the command (usage : !menu [restaurant])\n");
         let _ = writeln!(message, "### Restaurant list :\n");
