@@ -13,7 +13,11 @@ diesel = { version = "2.1.0", features = ["postgres", "chrono", "r2d2"] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 dotenv = "0.15.0"
 http = "1.4.0"
-matrix-sdk = { version = "0.16.0", features = ["markdown"] }
+matrix-sdk = { version = "0.16.0", default-features = false, features = [
+    "rustls-tls",
+    "e2e-encryption",
+    "markdown"
+] }
 petname = "2.0.2"
 regex = { version = "1"}
 reqwest = { version = "0.13.2", features = ["json"] }
