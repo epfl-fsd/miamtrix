@@ -98,11 +98,11 @@ impl ScheduleClient {
         Self::create_cron(&final_hour, &final_cron, &final_job, room_id)
     }
 
-    fn create_cron(hour: &str, cron: &str, command: &str, room_id: &str) -> String {
+    fn create_cron(complete_hour: &str, cron: &str, command: &str, room_id: &str) -> String {
         let room_id_closure = room_id.to_string();
         let command_closure = command.to_string();
         let handle = Handle::current();
-        let (hour, minutes) = Self::get_hour_minute(&hour);
+        let (hour, minutes) = Self::get_hour_minute(&complete_hour);
         let cron_expression = format!("0 {} {} * * {} *", minutes, hour, cron);
         let mut scheduler = CRON_SCHEDULER.lock().unwrap();
 
@@ -120,7 +120,7 @@ impl ScheduleClient {
         };
         drop(scheduler);
         let job_id_str = job_id;
-        NewCron::create(&room_id, &cron_expression, &command, &job_id_str, &hour);
+        NewCron::create(&room_id, &cron_expression, &command, &job_id_str, &complete_hour);
         "Task has been scheduled successfully.".to_string()
     }
 
