@@ -1,12 +1,6 @@
-use crate::utils::api::ApiClient;
-use crate::models::{
-    cafeteria::Cafeteria,
-    dish::Dish,
-};
-use crate::utils::{
-    filter_menu::filter_menu,
-    message::message
-};
+use crate::models::dish::Dish;
+use crate::utils::cache::get_cached_dishes;
+use crate::utils::message::message;
 
 pub async fn get_fries(args: &str) -> String {
     let mut city = "".to_string();
@@ -24,17 +18,10 @@ pub async fn get_fries(args: &str) -> String {
             }
         }
     }
-    let response = match ApiClient::get().await {
-      Ok(resp) => resp,
-      Err(_) => return "Error, could not reach the restaurant API.".to_string(),
+    let mut dishes: Vec<Dish> = match get_cached_dishes().await {
+        Ok(d) => d,
+        Err(_) => return format!("Sorry, Failed to load dish")
     };
-
-    let cafeterias: Vec<Cafeteria> = match response.json().await {
-        Ok(data) => data,
-        Err(_) => return "Error, Failed to load menus data".to_string(),
-    };
-
-    let mut dishes: Vec<Dish> = filter_menu(cafeterias);
 
     let search = ["fries", "frite"];
     dishes.retain(|d| {

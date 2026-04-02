@@ -1,7 +1,5 @@
 use crate::models::dish::Dish;
-use crate::utils::api::ApiClient;
-use crate::models::cafeteria::Cafeteria;
-use crate::utils::filter_menu::filter_menu;
+use crate::utils::cache::get_cached_dishes;
 use std::fmt::Write;
 use std::collections::BTreeMap;
 use deunicode::deunicode;
@@ -18,9 +16,10 @@ pub async fn list_restaurant(args: &str) -> String {
             }
         }
     }
-    let response = ApiClient::get().await.unwrap();
-    let cafeterias: Vec<Cafeteria> = response.json().await.unwrap();
-    let dishes: Vec<Dish> = filter_menu(cafeterias);
+    let dishes: Vec<Dish> = match get_cached_dishes().await {
+        Ok(d) => d,
+        Err(_) => return format!("Sorry, Failed to load data")
+    };
     let mut grouped_data: BTreeMap<String, BTreeMap<String, Vec<Dish>>> = BTreeMap::new();
 
     for dish in dishes {

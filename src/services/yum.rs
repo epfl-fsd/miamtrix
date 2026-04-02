@@ -1,13 +1,8 @@
-use crate::utils::api::ApiClient;
 use deunicode::deunicode;
-use crate::models::{
-    cafeteria::Cafeteria,
-    dish::Dish,
-};
-use crate::utils::{
-    filter_menu::filter_menu,
-    message::message
-};
+use crate::utils::cache::get_cached_dishes;
+use crate::models::dish::Dish;
+use crate::utils::message::message;
+
 
 pub async fn get_restaurant(args: &str) -> String {
     let mut search: Option<&str> = None;
@@ -41,17 +36,10 @@ pub async fn get_restaurant(args: &str) -> String {
     let target_allergen = allergen.map(|a| a.to_lowercase());
     let target_city = city.map(|c| deunicode(c).to_lowercase());
 
-    let response = ApiClient::get().await.unwrap();
-    let raw_bytes = match response.bytes().await {
-        Ok(b) => b,
-        Err(_) => return "Error, Failed to load menu data".to_string(),
+    let mut dishes: Vec<Dish> = match get_cached_dishes().await {
+        Ok(d) => d,
+        Err(_) => return format!("Sorry, Failed to load dish")
     };
-    let cafeterias: Vec<Cafeteria> = match serde_json::from_slice(&raw_bytes) {
-        Ok(data) => data,
-        Err(_) => return "Error, Failed to parse menus data".to_string(),
-    };
-
-    let mut dishes: Vec<Dish> = filter_menu(cafeterias);
 
 
     dishes.retain(|d| {

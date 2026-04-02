@@ -1,27 +1,16 @@
-use crate::utils::api::ApiClient;
-use std::fmt::Write;
-use crate::models::{
-    cafeteria::Cafeteria,
-    dish::Dish,
-};
-use crate::utils::{
-    filter_menu::filter_menu,
-    message::message
-};
+use crate::models::dish::Dish;
+use crate::utils::message::message;
+use crate::utils::cache::get_cached_dishes;
 
 pub async fn get_menu(command: &str) -> String {
-    let response = ApiClient::get().await.unwrap();
-    let cafeterias: Vec<Cafeteria> = response.json().await.unwrap();
     if command.is_empty() {
-        let mut message = format!("Please put a restaurant in the command (usage : !menu [restaurant])\n");
-        let _ = writeln!(message, "### Restaurant list :\n");
-        for resto in cafeterias {
-            let _ = writeln!(message, "- {}\n", &resto.name);
-        }
-        return message;
+         return "Please put a restaurant in the command (usage : !menu [restaurant])\n Run `!list` command to list all restaurant".to_string()
     }
+    let mut dishes: Vec<Dish> = match get_cached_dishes().await {
+        Ok(d) => d,
+        Err(_) => return format!("Sorry, Failed to load dish")
+    };
     let (restaurant, filter) = get_restaurant_filter(command);
-    let mut dishes: Vec<Dish> = filter_menu(cafeterias);
     if !restaurant.is_empty() {
         dishes = dishes.into_iter()
             .filter(|d| d.restaurant.to_lowercase().contains(&restaurant) && d.name.to_lowercase().contains(&filter))

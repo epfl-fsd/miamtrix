@@ -123,8 +123,10 @@ async fn message_listener(ev: OriginalSyncRoomMessageEvent, room: Room) {
         return;
     };
 
-    let commande_line = text_content.body.trim();
-    controller_command(&commande_line, room).await;
+    let commande_line = text_content.body.trim().to_string();
+    tokio::spawn(async move {
+        controller_command(&commande_line, room).await
+    });
 }
 
 fn recreate_all_cron() {
