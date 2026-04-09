@@ -1,4 +1,5 @@
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 use std::fs;
 
 pub fn init_logging() -> (tracing_appender::non_blocking::WorkerGuard, tracing_appender::non_blocking::WorkerGuard) {
@@ -17,7 +18,8 @@ pub fn init_logging() -> (tracing_appender::non_blocking::WorkerGuard, tracing_a
     let (err_file_writer, guard_err) = tracing_appender::non_blocking(err_file_appender);
     let err_file_layer = fmt::layer()
         .with_writer(err_file_writer)
-        .with_ansi(false);
+        .with_ansi(false)
+        .with_filter(LevelFilter::ERROR);
 
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| {
