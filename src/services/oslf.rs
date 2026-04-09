@@ -25,7 +25,7 @@ pub async fn get_fries(args: &str, cache: &SharedCache, api: &ApiClient) -> Stri
         Ok(d) => d,
         Err(e) => {
             log::warn!("Failed to load dishes in oslf command : {}", e);
-            return format!("Sorry, failed to load dishes: {}", e);
+            return format!("Sorry, failed to load dishes");
         }
     };
 

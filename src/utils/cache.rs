@@ -50,7 +50,7 @@ pub async fn get_cached_dishes(cache: &SharedCache, api: &ApiClient) -> Result<A
         .await
         .map_err(|e| {
             log::warn!("Failed to reach restaurant api: {}", e);
-            format!("Failed to reach restaurant api: {}", e)
+            format!("Failed to reach restaurant api")
         })?;
 
     let cafeterias: Vec<Cafeteria> = response
@@ -58,7 +58,7 @@ pub async fn get_cached_dishes(cache: &SharedCache, api: &ApiClient) -> Result<A
         .await
         .map_err(|e| {
             log::warn!("Failed to parse api's data: {}", e);
-            format!("Failed to parse api's data: {}", e)
+            format!("Failed to parse api's data")
         })?;
 
     let dishes = Arc::new(filter_menu(cafeterias));

@@ -122,7 +122,7 @@ impl ScheduleClient {
             Ok(id) => id.to_string(),
             Err(e) => {
                 log::warn!("Failed to schedule job: {}", e);
-                return format!("Failed to schedule job: {}", e);
+                return format!("Failed to schedule job");
             }
         };
 
@@ -135,7 +135,7 @@ impl ScheduleClient {
             complete_hour,
         ).await {
             log::warn!("Job scheduled but failed to persist: {}", e);
-            return format!("Job scheduled but failed to persist: {}", e);
+            return format!("Job scheduled but failed to persist");
         }
         log::info!("New task created for this room : {}", room_id);
         "Task has been scheduled successfully.".to_string()
@@ -183,7 +183,7 @@ USAGE:
 SUBCOMMANDS:
     create              Create a new scheduled task.
     -l, --list          List all scheduled tasks in the current room.
-    -h, --help          Print this help message.
+    --help              Print this help message.
 
 OPTIONS FOR 'create':
     -d, --date <DAYS>   Specify the day(s) to execute the command, mon-fri by default.

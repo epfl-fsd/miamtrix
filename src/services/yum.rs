@@ -44,7 +44,7 @@ pub async fn get_restaurant(args: &str, cache: &SharedCache, api: &ApiClient) ->
         Ok(d) => d,
         Err(e) => {
             log::warn!("Failed to load dishes in yum command : {}", e);
-            return format!("Sorry, failed to load dishes: {}", e)
+            return format!("Sorry, failed to load dishes")
         },
     };
 

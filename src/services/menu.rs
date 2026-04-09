@@ -14,7 +14,7 @@ pub async fn get_menu(command: &str, cache: &SharedCache, api: &ApiClient) -> St
         Ok(d) => d,
         Err(e) => {
             log::warn!("Failed to load dishes in menu command : {}", e);
-            return format!("Sorry, failed to load dishes: {}", e);
+            return format!("Sorry, failed to load dishes");
         }
     };
     let (restaurant, filter) = get_restaurant_filter(command);
