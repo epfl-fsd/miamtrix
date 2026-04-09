@@ -42,7 +42,10 @@ pub async fn get_restaurant(args: &str, cache: &SharedCache, api: &ApiClient) ->
 
     let dishes: Arc<Vec<Dish>> = match get_cached_dishes(cache, api).await {
         Ok(d) => d,
-        Err(e) => return format!("Sorry, failed to load dishes: {}", e),
+        Err(e) => {
+            log::warn!("Failed to load dishes in yum command : {}", e);
+            return format!("Sorry, failed to load dishes: {}", e)
+        },
     };
 
     let filtered: Vec<&Dish> = dishes.iter().filter(|d| {

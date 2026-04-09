@@ -15,6 +15,7 @@ use tokio::sync::mpsc;
 use tokio::time::{Duration, sleep};
 use tokio_cron_scheduler::JobScheduler;
 use chrono_tz::Europe::Zurich;
+use log;
 
 mod config;
 mod services;
@@ -23,7 +24,7 @@ mod models;
 mod schema;
 mod db;
 
-use crate::config::AppConfig;
+use crate::{config::AppConfig, utils::logs};
 use crate::db::{create_pool, run_migrations, DbPool};
 use crate::utils::api::ApiClient;
 use crate::utils::cache::{create_cache, SharedCache};
@@ -42,12 +43,19 @@ pub struct AppState {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
+    let _log_guards = logs::init_logging();
+    log::info!("Starting application");
     dotenv().ok();
 
+    log::info!("Load config");
     let config = Arc::new(AppConfig::load_env());
+
     run_migrations(&config.db_url);
+
+    log::info!("Create db pool");
     let db_pool = create_pool(&config.db_url);
 
+    log::info!("Init ApiClient");
     let api = Arc::new(ApiClient::new(
         config.api_uri.clone(),
         config.api_username.clone(),
@@ -55,8 +63,11 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     let cache = create_cache();
+
+    log::info!("Init Job Scheduler");
     let scheduler = JobScheduler::new().await?;
 
+    log::info!("Init Matrix client");
     let matrix_client = Arc::new(
         Client::builder()
             .homeserver_url(&config.url_server_matrix)
@@ -64,12 +75,14 @@ async fn main() -> anyhow::Result<()> {
             .await?
     );
 
+    log::info!("Authentication in matrix");
     matrix_client
         .matrix_auth()
         .login_username(&config.bot_username, &config.bot_password)
         .initial_device_display_name("Matrix-bot")
         .await?;
-    println!("logged in as {}", config.bot_username);
+
+    log::info!("logged in as {}", config.bot_username);
 
     let state = Arc::new(AppState {
         db: db_pool,
@@ -79,7 +92,6 @@ async fn main() -> anyhow::Result<()> {
         config,
         scheduler
     });
-
     recreate_all_cron(&state).await;
     state.scheduler.start().await?;
     login_and_sync(state).await?;
@@ -104,7 +116,6 @@ async fn login_and_sync(state: Arc<AppState>) -> anyhow::Result<()> {
                 return;
             };
             let cmd = text_content.body.trim().to_string();
-            // Filtre rapide : ignorer tout ce qui ne commence pas par '!'
             if !cmd.starts_with('!') {
                 return;
             }
@@ -118,8 +129,8 @@ async fn login_and_sync(state: Arc<AppState>) -> anyhow::Result<()> {
         tokio::spawn(async move {
             while let Some((cmd, room)) = rx.recv().await {
                 let state = Arc::clone(&state_dispatcher);
-                // Chaque commande dans sa propre tâche pour isolation
                 tokio::spawn(async move {
+                    log::info!("Command : {}, From : {}", &cmd, &room.room_id());
                     controller_command(&cmd, room, &state).await;
                 });
             }
@@ -147,15 +158,16 @@ async fn auto_accept_invites(
     tokio::spawn(async move {
         let mut delay = 2u64;
         while let Err(err) = room.join().await {
-            eprintln!("Failed to join {} ({err}), retry in {delay}s", room.room_id());
+            log::warn!("Failed to join {} ({err}), retry in {delay}s", room.room_id());
             sleep(Duration::from_secs(delay)).await;
             delay = (delay * 2).min(3600);
         }
-        println!("Joined room {}", room.room_id());
+        log::info!("Joined room {}", room.room_id());
     });
 }
 
 async fn recreate_all_cron(state: &Arc<AppState>) {
+    log::info!("Recreate all crons");
     let all_crons = Cron::get_all(&state.db).await;
     for cron in &all_crons {
         let state_clone = Arc::clone(state);
@@ -176,15 +188,15 @@ async fn recreate_all_cron(state: &Arc<AppState>) {
         ) {
             Ok(j) => j,
             Err(e) => {
-                eprintln!("Failed to recreate cron '{}': {}", cron.command, e);
+                log::error!("Failed to recreate cron '{}': {}", cron.command, e);
                 continue;
             }
         };
 
         if let Err(e) = state.scheduler.add(job).await {
-            eprintln!("Failed to add cron to scheduler: {}", e);
+            log::error!("Failed to add cron to scheduler: {}", e);
         }
     }
 
-    println!("Recreated {} cron jobs", all_crons.len());
+    log::info!("Recreated {} cron jobs", all_crons.len());
 }

@@ -120,7 +120,10 @@ impl ScheduleClient {
         };
         let job_id = match state.scheduler.add(job).await {
             Ok(id) => id.to_string(),
-            Err(e) => return format!("Failed to schedule job: {}", e),
+            Err(e) => {
+                log::warn!("Failed to schedule job: {}", e);
+                return format!("Failed to schedule job: {}", e);
+            }
         };
 
         if let Err(e) = NewCron::create(
@@ -131,15 +134,16 @@ impl ScheduleClient {
             &job_id,
             complete_hour,
         ).await {
+            log::warn!("Job scheduled but failed to persist: {}", e);
             return format!("Job scheduled but failed to persist: {}", e);
         }
-
+        log::info!("New task created for this room : {}", room_id);
         "Task has been scheduled successfully.".to_string()
     }
 
     pub async fn cron_job(room_id: &str, command: &str, state: &Arc<AppState>) {
         let Ok(parsed_room_id) = RoomId::parse(room_id) else {
-            eprintln!("Invalid room id: {}", room_id);
+            log::info!("Invalid room id: {}", room_id);
             return;
         };
 

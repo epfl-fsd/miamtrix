@@ -46,11 +46,10 @@ pub fn controller_command<'a>(commande_line: &'a str, room: Room, state: &'a Arc
         }
     };
     if let Err(e) = room.send(set_message(&response)).await {
-        eprintln!(
-            "[{}] Failed to send message to room {} : {}",
-            commande,
-            room.room_id(),
-            e
+        log::warn!("[{}] Failed to send message to room {} : {}",
+        commande,
+        room.room_id(),
+        e
         )
         }
     })

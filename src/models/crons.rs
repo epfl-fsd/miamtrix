@@ -46,7 +46,10 @@ impl<'a> NewCron<'a> {
         let job_id_owned = target_job_id.to_string();
         let hour_owned = target_hour.to_string();
 
-        let conn = pool.get().await.expect("Failed to get connection");
+        let conn = pool.get().await.map_err(|e| {
+            log::error!("Failed to get db pool connection for create crons: {}", e);
+            "Failed to connect to db".to_string()
+        })?;
         conn.interact(move |conn| {
             loop {
                 let generated_name = petname(2, " ")
@@ -68,45 +71,67 @@ impl<'a> NewCron<'a> {
                 {
                     Ok(cron) => return Ok(cron),
                     Err(DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _)) => {
+                        log::warn!("Conflict: Generate existing name when creating new cron");
                         continue;
                     }
-                    Err(_) => return Err(format!("Failed to create new cron")),
+                    Err(e) => {
+                        log::error!("Failed to create new cron : {}", e);
+                        return Err(format!("Failed to create new cron"));
+                    }
                 }
             }
         })
         .await
-        .expect("Failed to create new cron")
-
-    }
-    fn generate_name() -> String {
-        petname(2, " ").unwrap_or_else(|| "fallback name".to_string())
+        .map_err(|e| {
+            log::error!("Failed to create new cron : {}", e);
+            "Failed to create new cron".to_string()
+        })?
     }
 }
 
 impl Cron {
     pub async fn get_all(pool: &DbPool) -> Vec<Cron> {
-        let conn = pool.get().await.expect("Failed to get connection");
+        let conn = match pool.get().await {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!("Failed to get db pool : {}", e);
+                return Vec::new();
+            }
+        };
 
-        conn.interact(|conn| {
+        match conn.interact(|conn| {
             crons::table.select(Cron::as_select())
             .load(conn)
-        }).await
-        .expect("interact failed")
-        .expect("query failed")
+        }).await {
+            Ok(Ok(c)) => c,
+            Ok(Err(e)) => {
+                log::error!("Failed to load crons : {}", e);
+                Vec::new()
+            },
+            Err(e) => {
+                log::error!("Failed to load crons : {}", e);
+                Vec::new()
+            }
+        }
     }
     pub async fn delete_cron(pool: &DbPool, target_room_id: &str, target_name: &str) -> bool {
-        let conn = pool.get().await.expect("Failed to get connection");
+        let conn = match pool.get().await {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!("Failed to get db pool : {}", e);
+                return false
+            }
+        };
         let room_owned = target_room_id.to_string();
         let name_owned = target_name.to_string();
 
         conn.interact(move |conn| {
             diesel::delete(
                 crons::table.filter(
-                    // .and() chaîne deux conditions : WHERE room = $1 AND name = $2
                     room.eq(&room_owned).and(name.eq(&name_owned))
                 )
             )
-            .execute(conn) // retourne Result<usize> = nombre de lignes supprimées
+            .execute(conn)
         })
         .await
         .expect("query failed")
@@ -129,15 +154,29 @@ impl Cron {
     }
     pub async fn get_by_room_id(pool: &DbPool, target_room_id: &str) -> Vec<Cron> {
         let room_owned = target_room_id.to_string();
-        let conn = pool.get().await.expect("Failed to get connection");
-        conn.interact(move |conn| {
+        let conn = match pool.get().await {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!("Failed to get db pool : {}", e);
+                return Vec::new();
+            }
+        };
+        match conn.interact(move |conn| -> Result<Vec<Cron>, diesel::result::Error> {
             crons::table
-                .filter(room.eq(&room_owned))
+                .filter(crons::room.eq(&room_owned))
                 .select(Cron::as_select())
-                .load(conn)
+                .load::<Cron>(&mut *conn)
         })
-        .await
-        .expect("query failed")
-        .expect("Error")
+        .await {
+            Ok(Ok(c)) => c,
+            Ok(Err(e)) => {
+                log::error!("Failed to load crons : {}", e);
+                Vec::new()
+            },
+            Err(e) => {
+                log::error!("Failed to load crons : {}", e);
+                Vec::new()
+            }
+        }
     }
 }

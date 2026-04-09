@@ -12,7 +12,10 @@ pub async fn get_menu(command: &str, cache: &SharedCache, api: &ApiClient) -> St
     }
     let dishes: Arc<Vec<Dish>> = match get_cached_dishes(cache, api).await {
         Ok(d) => d,
-        Err(e) => return format!("Sorry, failed to load dishes: {}", e),
+        Err(e) => {
+            log::warn!("Failed to load dishes in menu command : {}", e);
+            return format!("Sorry, failed to load dishes: {}", e);
+        }
     };
     let (restaurant, filter) = get_restaurant_filter(command);
     let filtered_dishes: Vec<&Dish> = if !restaurant.is_empty() {

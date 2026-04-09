@@ -22,7 +22,10 @@ pub async fn list_restaurant(args: &str, cache: &SharedCache, api: &ApiClient) -
     }
     let dishes: Arc<Vec<Dish>> = match get_cached_dishes(cache, api).await {
         Ok(d) => d,
-        Err(e) => return format!("Sorry, failed to load dishes: {}", e),
+        Err(e) => {
+            log::warn!("Failed to load dishes in list command : {}", e);
+            return format!("Sorry, failed to load dishes: {}", e);
+        }
     };
     let mut grouped_data: BTreeMap<std::sync::Arc<str>, BTreeMap<std::sync::Arc<str>, Vec<&Dish>>> = BTreeMap::new();
 

@@ -16,15 +16,24 @@ pub fn create_pool(database_url: &str) -> DbPool {
     Pool::builder(manager)
         .max_size(10)
         .build()
-        .expect("Failed to create async db pool")
+        .unwrap_or_else(|e| {
+            log::error!("Failed to create db pool : {}", e);
+            panic!("Failed to create db pool");
+        })
 }
 
 pub fn run_migrations(database_url: &str) {
-    println!("Running database migrations ...");
+    log::info!("Running database migrations ...");
 
     let mut conn = PgConnection::establish(database_url)
-        .expect("Failed to connect for migrations");
+        .unwrap_or_else(|e| {
+            log::error!("Failed to connect db for migrations : {}", e);
+            panic!("Failed to connect db for migrations");
+        });
     conn.run_pending_migrations(MIGRATIONS)
-        .expect("Failed to run migrations");
-    println!("Migrations applied successfully");
+        .unwrap_or_else(|e| {
+            log::error!("Failed to run migrations : {}", e);
+            panic!("Failed to run migrations");
+        });
+    log::info!("Migrations applied successfully");
 }

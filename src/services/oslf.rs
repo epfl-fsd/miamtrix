@@ -23,7 +23,10 @@ pub async fn get_fries(args: &str, cache: &SharedCache, api: &ApiClient) -> Stri
     }
     let dishes: Arc<Vec<Dish>> = match get_cached_dishes(cache, api).await {
         Ok(d) => d,
-        Err(e) => return format!("Sorry, failed to load dishes: {}", e),
+        Err(e) => {
+            log::warn!("Failed to load dishes in oslf command : {}", e);
+            return format!("Sorry, failed to load dishes: {}", e);
+        }
     };
 
     let search = ["fries", "frite"];

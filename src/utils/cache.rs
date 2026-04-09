@@ -31,30 +31,40 @@ pub async fn get_cached_dishes(cache: &SharedCache, api: &ApiClient) -> Result<A
 
         if let Some(last_time) = cache_read.last_update {
             if last_time.elapsed() < CACHE_TTL && !cache_read.dishes.is_empty() {
+                log::info!("Cache used");
                 return Ok(Arc::clone(&cache_read.dishes));
             }
+            log::info!("Cache is out of duration")
         }
     }
     let mut cache_write = cache.write().await;
 
     if let Some(last_time) = cache_write.last_update {
         if last_time.elapsed() < CACHE_TTL && !cache_write.dishes.is_empty() {
+            log::info!("Cache used");
             return Ok(Arc::clone(&cache_write.dishes));
         }
+        log::info!("Cache is out of duration")
     }
     let response = api.get()
         .await
-        .map_err(|e| format!("Failed to reach restaurant api: {}", e))?;
+        .map_err(|e| {
+            log::warn!("Failed to reach restaurant api: {}", e);
+            format!("Failed to reach restaurant api: {}", e)
+        })?;
 
     let cafeterias: Vec<Cafeteria> = response
         .json()
         .await
-        .map_err(|e| format!("Failed to parse data: {}", e))?;
+        .map_err(|e| {
+            log::warn!("Failed to parse api's data: {}", e);
+            format!("Failed to parse api's data: {}", e)
+        })?;
 
     let dishes = Arc::new(filter_menu(cafeterias));
 
     cache_write.last_update = Some(Instant::now());
     cache_write.dishes = Arc::clone(&dishes);
-
+    log::info!("Rewriting Cache");
     Ok(dishes)
 }

@@ -20,6 +20,7 @@ impl ApiClient {
         }
     }
     pub async fn get(&self) -> Result<reqwest::Response, reqwest::Error> {
+        log::info!("Api call restaurant");
         let date_fmt = Local::now().format("%Y-%m-%d");
         self.client
             .get(format!("{}?date={}", self.base_url, date_fmt))
