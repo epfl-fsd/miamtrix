@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 #[derive(Debug, Clone)]
 pub struct Dish {
-    pub restaurant: String,
-    pub location: String,
-    pub menu_type: String,
-    pub name: String,
-    pub category: String,
-    pub alergen: Vec<String>
+    pub restaurant: Arc<str>,
+    pub location: Arc<str>,
+    pub menu_type: Arc<str>,
+    pub name: Arc<str>,
+    pub category: Arc<str>,
+    pub alergen: Vec<Arc<str>>
 }

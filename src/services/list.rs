@@ -3,8 +3,12 @@ use crate::utils::cache::get_cached_dishes;
 use std::fmt::Write;
 use std::collections::BTreeMap;
 use deunicode::deunicode;
+use crate::SharedCache;
+use crate::ApiClient;
+use std::sync::Arc;
 
-pub async fn list_restaurant(args: &str) -> String {
+
+pub async fn list_restaurant(args: &str, cache: &SharedCache, api: &ApiClient) -> String {
     let mut city: Option<&str> = None;
     let mut iter = args.split_whitespace();
 
@@ -16,13 +20,16 @@ pub async fn list_restaurant(args: &str) -> String {
             }
         }
     }
-    let dishes: Vec<Dish> = match get_cached_dishes().await {
+    let dishes: Arc<Vec<Dish>> = match get_cached_dishes(cache, api).await {
         Ok(d) => d,
-        Err(_) => return format!("Sorry, Failed to load data")
+        Err(e) => {
+            log::warn!("Failed to load dishes in list command : {}", e);
+            return format!("Sorry, failed to load dishes");
+        }
     };
-    let mut grouped_data: BTreeMap<String, BTreeMap<String, Vec<Dish>>> = BTreeMap::new();
+    let mut grouped_data: BTreeMap<std::sync::Arc<str>, BTreeMap<std::sync::Arc<str>, Vec<&Dish>>> = BTreeMap::new();
 
-    for dish in dishes {
+    for dish in dishes.iter() {
         let location = dish.location.clone();
         let restaurant = dish.restaurant.clone();
         grouped_data

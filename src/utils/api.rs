@@ -1,5 +1,3 @@
-use crate::config::CONFIG;
-use std::sync::OnceLock;
 use reqwest::Client;
 use chrono::Local;
 
@@ -11,25 +9,22 @@ pub struct ApiClient {
 
 
 }
-pub static API: OnceLock<ApiClient> = OnceLock::new();
 
 impl ApiClient {
-    pub fn init() {
-        let config = CONFIG.get().expect("Please, load the config before the loading of the client api.");
-        let instance = ApiClient {
-            base_url: config.api_uri.clone(),
-            api_password: config.api_password.clone(),
-            api_username: config.api_username.clone(),
+    pub fn new(base_url: String, api_username: String, api_password: String) -> Self {
+        ApiClient {
+            base_url,
+            api_password,
+            api_username,
             client: Client::new(),
-        };
-        let _ = API.set(instance);
+        }
     }
-    pub async fn get() -> Result<reqwest::Response, reqwest::Error> {
-        let api = API.get().expect("Client api not initialised.");
+    pub async fn get(&self) -> Result<reqwest::Response, reqwest::Error> {
+        log::info!("Api call restaurant");
         let date_fmt = Local::now().format("%Y-%m-%d");
-        api.client
-            .get(format!("{}?date={}", api.base_url, date_fmt))
-            .basic_auth(&api.api_username, Some(&api.api_password))
+        self.client
+            .get(format!("{}?date={}", self.base_url, date_fmt))
+            .basic_auth(&self.api_username, Some(&self.api_password))
             .send()
             .await
     }

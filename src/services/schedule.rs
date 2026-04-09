@@ -1,23 +1,21 @@
-use crate::models::crons::{NewCron, Cron as DbCron};
-use tokio::runtime::Handle;
+use std::sync::Arc;
 use std::fmt::Write;
 use std::sync::LazyLock;
 use matrix_sdk::ruma::RoomId;
-use crate::MATRIX_CLIENT;
 use regex::Regex;
-use crate::CRON_SCHEDULER;
+use tokio_cron_scheduler::Job;
+use chrono_tz::Europe::Zurich;
 
-
+use crate::models::crons::{NewCron, Cron as DbCron};
+use crate::AppState;
 use super::controller::controller_command;
 
 static DAY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     let d = "mon|tue|wed|thu|fri|sat|sun";
-    let pattern = format!("^(?:{d})(?:,(?:{d}))*$|^(?:{d})-(?:{d})$");
-    Regex::new(&pattern).unwrap()
+    Regex::new(&format!("^(?:{d})(?:,(?:{d}))*$|^(?:{d})-(?:{d})$")).unwrap()
 });
 static HOUR_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    let pattern = format!("^([01][0-9]|2[0-3]):([0-5][0-9])$");
-    Regex::new(&pattern).unwrap()
+    Regex::new("^([01][0-9]|2[0-3]):([0-5][0-9])$").unwrap()
 });
 
 
@@ -30,13 +28,13 @@ impl ScheduleClient {
     fn is_valide_schedule_hour(input: &str) -> bool {
         HOUR_REGEX.is_match(input)
     }
-    fn get_hour_minute(input: &str) -> (String, String) {
-        let mut hours = input.split(":");
-        let hour = hours.next().unwrap_or("").to_lowercase();
-        let minutes = hours.next().unwrap_or("").to_lowercase();
+    fn get_hour_minute(input: &str) -> (&str, &str) {
+        let mut parts = input.splitn(2, ":");
+        let hour = parts.next().unwrap_or("");
+        let minutes = parts.next().unwrap_or("");
         (hour, minutes)
     }
-    fn controller_create_cron(args: &str, room_id: &str) -> String {
+    async fn controller_create_cron(args: &str, room_id: &str, state: &Arc<AppState>) -> String {
         let mut cron = None;
         let mut job = None;
         let mut hour = None;
@@ -88,74 +86,87 @@ impl ScheduleClient {
                 }
             }
         }
-        let final_cron = cron.unwrap_or_else(|| "mon-fri".to_string());
+        let final_days = cron.unwrap_or_else(|| "mon-fri".to_string());
         let final_hour = hour.unwrap_or_else(|| "11:30".to_string());
         let final_job = match job {
             Some(j) => j,
             None => return format!("Error: The `-j` (job) flag is mandatory.\n{}", Self::schedule_help())
         };
 
-        Self::create_cron(&final_hour, &final_cron, &final_job, room_id)
+        Self::create_cron(&final_hour, &final_days, &final_job, room_id, state).await
     }
 
-    fn create_cron(complete_hour: &str, cron: &str, command: &str, room_id: &str) -> String {
-        let room_id_closure = room_id.to_string();
-        let command_closure = command.to_string();
-        let handle = Handle::current();
+    async fn create_cron(complete_hour: &str, days: &str, command: &str, room_id: &str, state: &Arc<AppState>) -> String {
         let (hour, minutes) = Self::get_hour_minute(&complete_hour);
-        let cron_expression = format!("0 {} {} * * {} *", minutes, hour, cron);
-        let mut scheduler = CRON_SCHEDULER.lock().unwrap();
+        let cron_expression = format!("0 {} {} * * {} *", minutes, hour, days);
 
-        let job_id = match scheduler.add_fn(&cron_expression, move || {
-            let r_id = room_id_closure.clone();
-            let cmd = command_closure.clone();
-            handle.spawn(async move {
-                Self::cron_job(&r_id, &cmd).await;
-            });
+        let state_clone = Arc::clone(state);
+        let room_id_owned = room_id.to_string();
+        let command_owned = command.to_string();
+
+
+        let job = match Job::new_async_tz(cron_expression.as_str(), Zurich, move |_uuid, _lock| {
+            let state = Arc::clone(&state_clone);
+            let r_id = room_id_owned.clone();
+            let cmd = command_owned.clone();
+            Box::pin(async move {
+                Self::cron_job(&r_id, &cmd, &state).await;
+            })
         }) {
-          Ok(id) => id.to_string(),
+          Ok(j) => j,
           Err(_) => {
               return format!("Failed to create task, read the doc : {}", Self::schedule_help());
           }
         };
-        drop(scheduler);
-        let job_id_str = job_id;
-        NewCron::create(&room_id, &cron_expression, &command, &job_id_str, &complete_hour);
+        let job_id = match state.scheduler.add(job).await {
+            Ok(id) => id.to_string(),
+            Err(e) => {
+                log::warn!("Failed to schedule job: {}", e);
+                return format!("Failed to schedule job");
+            }
+        };
+
+        if let Err(e) = NewCron::create(
+            &state.db,
+            room_id,
+            &cron_expression,
+            command,
+            &job_id,
+            complete_hour,
+        ).await {
+            log::warn!("Job scheduled but failed to persist: {}", e);
+            return format!("Job scheduled but failed to persist");
+        }
+        log::info!("New task created for this room : {}", room_id);
         "Task has been scheduled successfully.".to_string()
     }
 
-    pub async fn cron_job(room_id: &str, command: &str) {
-        let Some(client) = MATRIX_CLIENT.get() else {
-            eprintln!("Error: Matrix client not initialised when cron triggered.");
-            return;
-        };
+    pub async fn cron_job(room_id: &str, command: &str, state: &Arc<AppState>) {
         let Ok(parsed_room_id) = RoomId::parse(room_id) else {
-            eprintln!("Invalid room id : {}", room_id);
+            log::info!("Invalid room id: {}", room_id);
             return;
         };
-        if let Some(room) = client.get_room(&parsed_room_id) {
-            controller_command(command, room).await;
+
+        if let Some(room) = state.matrix_client.get_room(&parsed_room_id) {
+            controller_command(command, room, state).await;
         }
     }
 
-    fn list_room_crons(room_id: &str) -> String {
-        let room_crons = DbCron::get_by_room_id(room_id);
+    async fn list_room_crons(room_id: &str, state: &Arc<AppState>) -> String {
+        let room_crons = DbCron::get_by_room_id(&state.db, room_id).await;
+
         if room_crons.is_empty() {
             return "There is no Task created in this room \n Create your first task with this command to schedule every day of the week a command : \n `!schedule -c mon-fri !menu hopper`".to_string()
         }
-        let mut message = String::from("List of task of this room : \n");
-        for cron in room_crons {
-            if let Some(days) = cron.cron_expression.split_whitespace().nth(5) {
-                let _ = writeln!(message, " - Cron name : **{}**", cron.name );
-                let _ = writeln!(message, " Command : **{}**", cron.command);
-                let _ = writeln!(message, " Day(s) : **{}**", days);
-                let _ = writeln!(message, " Hour : **{}**", cron.hour);
-            } else {
-                let _ = writeln!(message, " - Command : **{}**", cron.command);
-                let _ = writeln!(message, " Day(s) : **Undefined day(s)**");
-                let _ = writeln!(message, " Hour : **{}**", cron.hour);
-            }
+        let mut message = String::with_capacity(room_crons.len() * 100);
+        message.push_str("List of tasks in this room:\n");
 
+        for cron in room_crons {
+            let days = cron.cron_expression
+                .split_whitespace()
+                .nth(5)
+                .unwrap_or("Undefined");
+            let _ = writeln!(message, " - **{}** | `{}` | {} | {}", cron.name, cron.command, days, cron.hour);
         }
         message
     }
@@ -172,7 +183,7 @@ USAGE:
 SUBCOMMANDS:
     create              Create a new scheduled task.
     -l, --list          List all scheduled tasks in the current room.
-    -h, --help          Print this help message.
+    --help              Print this help message.
 
 OPTIONS FOR 'create':
     -d, --date <DAYS>   Specify the day(s) to execute the command, mon-fri by default.
@@ -200,18 +211,18 @@ EXAMPLES:
             "
     }
 
-    pub async fn controller_schedule(args: &str, room_id: &str) -> String {
+    pub async fn controller_schedule(args: &str, room_id: &str, state: &Arc<AppState>) -> String {
         let mut iter = args.split_ascii_whitespace();
         match iter.next() {
             Some("create") => {
                 let remaining_args = args.trim_start_matches("create").trim();
                 if !remaining_args.is_empty() {
-                    Self::controller_create_cron(remaining_args, room_id)
+                    Self::controller_create_cron(remaining_args, room_id, state).await
                 } else {
                     Self::schedule_help().to_string()
                 }
             }
-            Some("-l" | "--list") => Self::list_room_crons(&room_id),
+            Some("-l" | "--list") => Self::list_room_crons(&room_id, state).await,
             _ => Self::schedule_help().to_string(),
         }
     }

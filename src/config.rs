@@ -1,5 +1,4 @@
 use std::env;
-use std::sync::OnceLock;
 
 #[derive(Debug)]
 pub struct AppConfig {
@@ -14,7 +13,6 @@ pub struct AppConfig {
     pub db_url: String,
 }
 
-pub static CONFIG: OnceLock<AppConfig> = OnceLock::new();
 
 impl AppConfig {
     pub fn load_env() -> Self {

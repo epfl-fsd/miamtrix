@@ -6,57 +6,65 @@ use crate::utils::{
     api::ApiClient,
     filter_menu::filter_menu,
 };
-use std::sync::OnceLock;
+use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::time::{Instant, Duration};
 
 pub struct DishCache {
     pub last_update: Option<Instant>,
-    pub dishes: Vec<Dish>,
+    pub dishes: Arc<Vec<Dish>>,
 }
-pub static CACHE: OnceLock<RwLock<DishCache>> = OnceLock::new();
+pub type SharedCache = Arc<RwLock<DishCache>>;
+
+pub fn create_cache() -> SharedCache {
+    Arc::new(RwLock::new(DishCache {
+        last_update: None,
+        dishes: Arc::new(Vec::new()),
+    }))
+}
 
 const CACHE_TTL: Duration = Duration::from_secs(30 * 60);
 
-pub async fn get_cached_dishes() -> Result<Vec<Dish>, String> {
-    let cache_lock = CACHE.get_or_init(|| {
-        RwLock::new(DishCache {
-            last_update: None,
-            dishes: Vec::new(),
-        })
-    });
-
+pub async fn get_cached_dishes(cache: &SharedCache, api: &ApiClient) -> Result<Arc<Vec<Dish>>, String> {
     {
-        let cache_read = cache_lock.read().await;
+        let cache_read = cache.read().await;
 
         if let Some(last_time) = cache_read.last_update {
             if last_time.elapsed() < CACHE_TTL && !cache_read.dishes.is_empty() {
-                return Ok(cache_read.dishes.clone());
+                log::info!("Cache used");
+                return Ok(Arc::clone(&cache_read.dishes));
             }
+            log::info!("Cache is out of duration")
         }
     }
-
-    let mut cache_write = cache_lock.write().await;
+    let mut cache_write = cache.write().await;
 
     if let Some(last_time) = cache_write.last_update {
         if last_time.elapsed() < CACHE_TTL && !cache_write.dishes.is_empty() {
-            return Ok(cache_write.dishes.clone());
+            log::info!("Cache used");
+            return Ok(Arc::clone(&cache_write.dishes));
         }
+        log::info!("Cache is out of duration")
     }
-    let response = ApiClient::get()
+    let response = api.get()
         .await
-        .map_err(|_| "Failed to reach restaurant api".to_string())?;
+        .map_err(|e| {
+            log::warn!("Failed to reach restaurant api: {}", e);
+            format!("Failed to reach restaurant api")
+        })?;
 
     let cafeterias: Vec<Cafeteria> = response
         .json()
         .await
-        .map_err(|_| "Failed to parse data".to_string())?;
+        .map_err(|e| {
+            log::warn!("Failed to parse api's data: {}", e);
+            format!("Failed to parse api's data")
+        })?;
 
-    let dishes = filter_menu(cafeterias);
+    let dishes = Arc::new(filter_menu(cafeterias));
 
     cache_write.last_update = Some(Instant::now());
-    cache_write.dishes = dishes.clone();
-
+    cache_write.dishes = Arc::clone(&dishes);
+    log::info!("Rewriting Cache");
     Ok(dishes)
-
 }

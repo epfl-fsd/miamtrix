@@ -6,6 +6,7 @@ use matrix_sdk::{
         }
     }
 };
+use std::sync::Arc;
 
 use super::list::list_restaurant;
 use super::menu::get_menu;
@@ -13,42 +14,45 @@ use super::yum::get_restaurant;
 use super::oslf::get_fries;
 use super::help::get_help;
 use super::schedule::ScheduleClient;
+use crate::AppState;
 
-pub async fn controller_command(commande_line: &str, room: Room) {
-    let (commande, args) = match commande_line.split_once(' ') {
-        Some((cmd, reste)) => (cmd, reste),
-        None => (commande_line, ""),
-    };
+pub fn controller_command<'a>(commande_line: &'a str, room: Room, state: &'a Arc<AppState>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'a>> {
+    Box::pin(async move {
+    let (commande, args) = commande_line
+        .split_once(' ')
+        .unwrap_or((commande_line, ""));
 
-    match commande {
+    let response: String = match commande {
         "!schedule" => {
-            let response = ScheduleClient::controller_schedule(&args, &room.room_id().to_string()).await;
-            room.send(set_message(&response)).await.unwrap();
+            ScheduleClient::controller_schedule(&args, &room.room_id().to_string(), state).await
         }
         "!yum" => {
-            let restaurant = get_restaurant(&args.trim()).await;
-            room.send(set_message(&restaurant)).await.unwrap();
+            get_restaurant(&args.trim(), &state.cache, &state.api).await
         }
         "!menu" => {
-            let menu = get_menu(&args.trim()).await;
-            room.send(set_message(&menu)).await.unwrap();
+            get_menu(&args.trim(), &state.cache, &state.api).await
         }
         "!oslf" => {
-            let fries = get_fries(&args.trim()).await;
-            room.send(set_message(&fries)).await.unwrap();
+            get_fries(&args.trim(), &state.cache, &state.api).await
         }
         "!list" => {
-            let list = list_restaurant(&args.trim()).await;
-            room.send(set_message(&list)).await.unwrap();
+            list_restaurant(&args.trim(), &state.cache, &state.api).await
         }
         "!help" => {
-            let help_message = get_help();
-            room.send(set_message(&help_message)).await.unwrap();
+            get_help(&state.config.bot_repo, &state.config.bot_version)
         }
         _ => {
-            println!("Message ignoré : {}", commande_line)
+            return;
         }
-    }
+    };
+    if let Err(e) = room.send(set_message(&response)).await {
+        log::warn!("[{}] Failed to send message to room {} : {}",
+        commande,
+        room.room_id(),
+        e
+        )
+        }
+    })
 }
 
 fn set_message(message: &str) -> RoomMessageEventContent {

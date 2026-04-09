@@ -1,7 +1,4 @@
-use crate::config::CONFIG;
-
-pub fn get_help() -> String {
-    let config = CONFIG.get().expect("Failed to load config");
+pub fn get_help(repo: &str, version: &str) -> String {
 
     let help_message = format!("\
     Available commands: `!menu`, `!yum`, `!oslf`, `!help`, `!schedule`
@@ -11,7 +8,7 @@ pub fn get_help() -> String {
     `!oslf` [-c | --city <city>]                        List locations of french fries across EPFL's campus.
     `!list` [-c | --city <city>]                        List all restaurants across EPFL's campus.
     `!help`                                             Get help with commands.
-    version: `{}`, [source code]({}).", config.bot_version, config.bot_repo);
+    version: `{}`, [source code]({}).", version, repo);
 
     return help_message;
 

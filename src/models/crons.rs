@@ -2,8 +2,7 @@ use diesel::{
     prelude::*,
     result::{DatabaseErrorKind, Error as DieselError}
 };
-use crate::schema::crons;
-use crate::db::DbClient;
+use crate::{db::DbPool, schema::crons};
 use crate::schema::crons::dsl::*;
 use petname::petname;
 
@@ -32,90 +31,152 @@ pub struct NewCron<'a> {
 }
 
 impl<'a> NewCron<'a> {
-    pub fn create(
+    pub async fn create(
+        pool: &DbPool,
         target_room: &'a str,
         target_cron: &'a str,
         target_command: &'a str,
         target_job_id: &'a str,
         target_hour: &'a str,
-    ) -> Cron {
-        let mut conn = DbClient::get_connection();
+    ) -> Result<Cron, String> {
 
-        loop {
-            let generated_name = Self::generate_name();
+        let room_owned = target_room.to_string();
+        let cron_owned = target_cron.to_string();
+        let command_owned = target_command.to_string();
+        let job_id_owned = target_job_id.to_string();
+        let hour_owned = target_hour.to_string();
 
-            let new_cron = NewCron {
-                name: &generated_name,
-                room: &target_room,
-                cron_expression: &target_cron,
-                command: &target_command,
-                job_id: &target_job_id,
-                hour: &target_hour
-            };
+        let conn = pool.get().await.map_err(|e| {
+            log::error!("Failed to get db pool connection for create crons: {}", e);
+            "Failed to connect to db".to_string()
+        })?;
+        conn.interact(move |conn| {
+            loop {
+                let generated_name = petname(2, " ")
+                    .unwrap_or_else(|| "fallback-name".to_string());
 
-            match diesel::insert_into(crons)
-                .values(&new_cron)
-                .returning(Cron::as_returning())
-                .get_result(&mut conn)
-            {
-                Ok(cron) => {
-                    return cron;
-                }
-                Err(DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _)) => {
-                    continue;
-                }
-                Err(_) => {
-                    println!("Failed to create new cron");
-                    continue;
+                let new_cron = NewCron {
+                    name: &generated_name,
+                    room: &room_owned,
+                    cron_expression: &cron_owned,
+                    command: &command_owned,
+                    job_id: &job_id_owned,
+                    hour: &hour_owned
+                };
+
+                match diesel::insert_into(crons::table)
+                    .values(&new_cron)
+                    .returning(Cron::as_returning())
+                    .get_result(conn)
+                {
+                    Ok(cron) => return Ok(cron),
+                    Err(DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _)) => {
+                        log::warn!("Conflict: Generate existing name when creating new cron");
+                        continue;
+                    }
+                    Err(e) => {
+                        log::error!("Failed to create new cron : {}", e);
+                        return Err(format!("Failed to create new cron"));
+                    }
                 }
             }
-        }
-    }
-    fn generate_name() -> String {
-        petname(2, " ").unwrap_or_else(|| "fallback name".to_string())
+        })
+        .await
+        .map_err(|e| {
+            log::error!("Failed to create new cron : {}", e);
+            "Failed to create new cron".to_string()
+        })?
     }
 }
 
 impl Cron {
-    pub fn get_all() -> Vec<Cron> {
-        let mut conn = DbClient::get_connection();
+    pub async fn get_all(pool: &DbPool) -> Vec<Cron> {
+        let conn = match pool.get().await {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!("Failed to get db pool : {}", e);
+                return Vec::new();
+            }
+        };
 
-        crons
-            .select(Cron::as_select())
-            .load(&mut conn)
-            .expect("Failed to load all crons")
-    }
-    pub fn delete_cron(target_room_id: &str, target_name: &str) -> bool {
-        let mut conn = DbClient::get_connection();
-
-        let deleted_cron = diesel::delete(crons.filter(room.eq(target_room_id).and(name.eq(target_name))))
-            .execute(&mut conn);
-
-        if !deleted_cron.is_err() {
-            return true;
+        match conn.interact(|conn| {
+            crons::table.select(Cron::as_select())
+            .load(conn)
+        }).await {
+            Ok(Ok(c)) => c,
+            Ok(Err(e)) => {
+                log::error!("Failed to load crons : {}", e);
+                Vec::new()
+            },
+            Err(e) => {
+                log::error!("Failed to load crons : {}", e);
+                Vec::new()
+            }
         }
-        false
     }
-    pub fn update_cron(cron: &Cron, cron_id: i32) -> bool {
-        let mut conn = DbClient::get_connection();
-        let updated_cron = diesel::update(crons.filter(id.eq(cron_id)))
-            .set(cron)
-            .execute(&mut conn);
+    pub async fn delete_cron(pool: &DbPool, target_room_id: &str, target_name: &str) -> bool {
+        let conn = match pool.get().await {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!("Failed to get db pool : {}", e);
+                return false
+            }
+        };
+        let room_owned = target_room_id.to_string();
+        let name_owned = target_name.to_string();
 
-        match updated_cron {
-            Ok(rows_affected) => rows_affected > 0,
-            Err(_) => false,
+        conn.interact(move |conn| {
+            diesel::delete(
+                crons::table.filter(
+                    room.eq(&room_owned).and(name.eq(&name_owned))
+                )
+            )
+            .execute(conn)
+        })
+        .await
+        .expect("query failed")
+        .map(|rows_deleted| rows_deleted > 0)
+        .expect("Interact failed")
+    }
+    pub async fn update_cron(pool: &DbPool, cron: Cron, cron_id: i32) -> bool {
+        let conn = pool.get().await.expect("Failed to get connection");
+
+        conn.interact(move |conn| {
+            diesel::update(crons::table.filter(id.eq(cron_id)))
+                .set(&cron)   // AsChangeset génère le SET automatiquement
+                .execute(conn)     // execute() retourne le nombre de lignes affectées
+        })
+        .await
+        .expect("query failed")
+        .map(|rows_affected| rows_affected > 0)
+        .expect("Interact failed")
+
+    }
+    pub async fn get_by_room_id(pool: &DbPool, target_room_id: &str) -> Vec<Cron> {
+        let room_owned = target_room_id.to_string();
+        let conn = match pool.get().await {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!("Failed to get db pool : {}", e);
+                return Vec::new();
+            }
+        };
+        match conn.interact(move |conn| -> Result<Vec<Cron>, diesel::result::Error> {
+            crons::table
+                .filter(crons::room.eq(&room_owned))
+                .select(Cron::as_select())
+                .load::<Cron>(&mut *conn)
+        })
+        .await {
+            Ok(Ok(c)) => c,
+            Ok(Err(e)) => {
+                log::error!("Failed to load crons : {}", e);
+                Vec::new()
+            },
+            Err(e) => {
+                log::error!("Failed to load crons : {}", e);
+                Vec::new()
+            }
         }
-
-    }
-    pub fn get_by_room_id(target_room_id: &str) -> Vec<Cron> {
-        use crate::schema::crons::dsl::*;
-        let mut conn = DbClient::get_connection();
-
-        crons
-            .filter(room.eq(target_room_id))
-            .select(Cron::as_select())
-            .load(&mut conn)
-            .expect("Failed to load cron by room")
     }
 }

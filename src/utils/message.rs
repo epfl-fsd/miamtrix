@@ -2,10 +2,10 @@ use crate::models::dish::Dish;
 use std::fmt::Write;
 use std::collections::BTreeMap;
 
-pub fn message(dishes: Vec<Dish>) -> String {
+pub fn message(dishes: Vec<&Dish>) -> String {
     let mut message = String::with_capacity(dishes.len() * 120 + 50);
     message.push_str("# Daily menu :\n\n");
-    let mut grouped_data: BTreeMap<String, BTreeMap<String, Vec<Dish>>> = BTreeMap::new();
+    let mut grouped_data: BTreeMap<std::sync::Arc<str>, BTreeMap<std::sync::Arc<str>, Vec<&Dish>>> = BTreeMap::new();
 
     for dish in dishes {
         let location = dish.location.clone();

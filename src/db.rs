@@ -1,38 +1,39 @@
 use diesel::{
     pg::PgConnection,
-    r2d2::{ConnectionManager, Pool, PooledConnection}
+    Connection,
 };
-use std::sync::OnceLock;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use deadpool_diesel::postgres::{Manager, Pool};
+use deadpool_diesel::Runtime;
 
-pub type DbPool = Pool<ConnectionManager<PgConnection>>;
-pub static DB_POOL: OnceLock<DbPool> = OnceLock::new();
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations/");
+pub type DbPool = Pool;
 
-pub struct DbClient;
 
-impl DbClient {
-    pub fn init(database_url: &str) {
-        let manager = ConnectionManager::<PgConnection>::new(database_url);
+pub fn create_pool(database_url: &str) -> DbPool {
+    let manager = Manager::new(database_url, Runtime::Tokio1);
 
-        let pool = Pool::builder()
-            .build(manager)
-            .expect("Failed to create db pool");
+    Pool::builder(manager)
+        .max_size(10)
+        .build()
+        .unwrap_or_else(|e| {
+            log::error!("Failed to create db pool : {}", e);
+            panic!("Failed to create db pool");
+        })
+}
 
-        let _ = DB_POOL.set(pool);
+pub fn run_migrations(database_url: &str) {
+    log::info!("Running database migrations ...");
 
-        let mut conn = Self::get_connection();
-        println!("Running database migrations ...");
-        conn.run_pending_migrations(MIGRATIONS).unwrap();
-        println!("Migrations applied successfully");
-
-    }
-
-    pub fn get_connection() -> PooledConnection<ConnectionManager<PgConnection>> {
-        DB_POOL
-            .get()
-            .expect("DB is not initialised.")
-            .get()
-            .expect("Failed to get pool connection")
-    }
+    let mut conn = PgConnection::establish(database_url)
+        .unwrap_or_else(|e| {
+            log::error!("Failed to connect db for migrations : {}", e);
+            panic!("Failed to connect db for migrations");
+        });
+    conn.run_pending_migrations(MIGRATIONS)
+        .unwrap_or_else(|e| {
+            log::error!("Failed to run migrations : {}", e);
+            panic!("Failed to run migrations");
+        });
+    log::info!("Migrations applied successfully");
 }
