@@ -2,6 +2,7 @@ use crate::models::{
     dish::Dish,
     cafeteria::Cafeteria
 };
+use std::sync::Arc;
 
 pub fn filter_menu(cafeterias: Vec<Cafeteria>) -> Vec<Dish> {
     let mut plats = Vec::with_capacity(cafeterias.len() * 15);
@@ -15,18 +16,19 @@ pub fn filter_menu(cafeterias: Vec<Cafeteria>) -> Vec<Dish> {
             _ => "Lausanne"
         };
 
-        let cafet_name = cafet_name_str.to_string();
-        let cafet_location = cafet_location_str.to_string();
+        let cafet_name: Arc<str> = Arc::from(cafet_name_str);
+        let cafet_location: Arc<str> = Arc::from(cafet_location_str);
+
         for menu in resto.menu_lines {
-            let menu_name = menu.name.trim().to_string();
+            let menu_name: Arc<str> = Arc::from(menu.name.trim());
             if menu.meals.is_empty() {
                 plats.push(Dish {
-                    restaurant: cafet_name.clone(),
-                    menu_type: menu_name.clone(),
-                    location: cafet_location.clone(),
-                    name: menu_name,
-                    category: "unclassified".to_string(),
-                    alergen: vec!["alergen not specified".to_string()]
+                    restaurant: Arc::clone(&cafet_name),
+                    menu_type: Arc::clone(&menu_name),
+                    location: Arc::clone(&cafet_location),
+                    name: Arc::clone(&menu_name),
+                    category: Arc::from("unclassified"),
+                    alergen: vec![Arc::from("alergen not specified")],
                 });
                 continue;
             }
@@ -39,15 +41,15 @@ pub fn filter_menu(cafeterias: Vec<Cafeteria>) -> Vec<Dish> {
                         .collect();
 
                     plats.push(Dish {
-                        restaurant: cafet_name.clone(),
-                        menu_type: menu.name.clone(),
-                        location: cafet_location.clone(),
-                        name: item.recipe.name.trim().to_string(),
-                        category: item.recipe.category.trim().to_string(),
+                        restaurant: Arc::clone(&cafet_name),
+                        menu_type: Arc::clone(&menu_name),
+                        location: Arc::clone(&cafet_location),
+                        name: Arc::from(item.recipe.name.trim()),
+                        category: Arc::from(item.recipe.category.trim()),
                         alergen: if extracted_labels.is_empty() {
-                                vec!["alergen not specified".to_string()]
+                                vec![Arc::from("alergen not specified")]
                             } else {
-                                extracted_labels
+                                extracted_labels.into_iter().map(|s| Arc::from(s.as_str())).collect()
                             }
                     });
                 }

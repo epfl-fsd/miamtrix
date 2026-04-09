@@ -1,10 +1,14 @@
 use deunicode::deunicode;
-use crate::utils::cache::get_cached_dishes;
+use std::sync::Arc;
+use crate::utils::{
+    cache::{get_cached_dishes, SharedCache},
+    api::ApiClient,
+};
 use crate::models::dish::Dish;
 use crate::utils::message::message;
 
 
-pub async fn get_restaurant(args: &str) -> String {
+pub async fn get_restaurant(args: &str, cache: &SharedCache, api: &ApiClient) -> String {
     let mut search: Option<&str> = None;
     let mut city: Option<&str> = None;
     let mut allergen: Option<&str> = None;
@@ -36,38 +40,36 @@ pub async fn get_restaurant(args: &str) -> String {
     let target_allergen = allergen.map(|a| a.to_lowercase());
     let target_city = city.map(|c| deunicode(c).to_lowercase());
 
-    let mut dishes: Vec<Dish> = match get_cached_dishes().await {
+    let dishes: Arc<Vec<Dish>> = match get_cached_dishes(cache, api).await {
         Ok(d) => d,
-        Err(_) => return format!("Sorry, Failed to load dish")
+        Err(e) => return format!("Sorry, failed to load dishes: {}", e),
     };
 
-
-    dishes.retain(|d| {
+    let filtered: Vec<&Dish> = dishes.iter().filter(|d| {
         if let Some(ref c) = target_city {
-            if deunicode(&d.location).to_lowercase() != *c {
+            if deunicode(d.location.as_ref()).to_lowercase() != *c {
                 return false;
             }
         }
+
         if let Some(ref a) = target_allergen {
-            let contains_alergen = d.alergen.iter().any(|al| {
-                if al == "alergen not specified" {
+            let contains_allergen = d.alergen.iter().any(|al| {
+                if al.as_ref() == "alergen not specified" {
                     return true;
                 }
                 al.to_lowercase().contains(a)
             });
-            if contains_alergen {
+            if contains_allergen {
                 return false;
             }
         }
+
         let contains_term = d.name.to_lowercase().contains(&term_lower)
-            ||d.menu_type.to_lowercase().contains(&term_lower)
+            || d.menu_type.to_lowercase().contains(&term_lower)
             || d.restaurant.to_lowercase().contains(&term_lower);
 
-        if is_exclusion {
-            !contains_term
-        } else {
-            contains_term
-        }
-    });
-    message(dishes)
+        if is_exclusion { !contains_term } else { contains_term }
+    }).collect();
+
+    message(filtered)
 }

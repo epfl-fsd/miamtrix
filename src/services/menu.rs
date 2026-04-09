@@ -1,22 +1,28 @@
 use crate::models::dish::Dish;
 use crate::utils::message::message;
 use crate::utils::cache::get_cached_dishes;
+use crate::SharedCache;
+use crate::ApiClient;
+use std::sync::Arc;
 
-pub async fn get_menu(command: &str) -> String {
+
+pub async fn get_menu(command: &str, cache: &SharedCache, api: &ApiClient) -> String {
     if command.is_empty() {
          return "Please put a restaurant in the command (usage : !menu [restaurant])\n Run `!list` command to list all restaurant".to_string()
     }
-    let mut dishes: Vec<Dish> = match get_cached_dishes().await {
+    let dishes: Arc<Vec<Dish>> = match get_cached_dishes(cache, api).await {
         Ok(d) => d,
-        Err(_) => return format!("Sorry, Failed to load dish")
+        Err(e) => return format!("Sorry, failed to load dishes: {}", e),
     };
     let (restaurant, filter) = get_restaurant_filter(command);
-    if !restaurant.is_empty() {
-        dishes = dishes.into_iter()
+    let filtered_dishes: Vec<&Dish> = if !restaurant.is_empty() {
+        dishes.iter()
             .filter(|d| d.restaurant.to_lowercase().contains(&restaurant) && d.name.to_lowercase().contains(&filter))
-            .collect();
-    }
-    let message: String = message(dishes);
+            .collect()
+    } else {
+        dishes.iter().collect()
+    };
+    let message: String = message(filtered_dishes);
     message
 }
 
