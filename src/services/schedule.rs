@@ -4,6 +4,7 @@ use std::sync::LazyLock;
 use matrix_sdk::ruma::RoomId;
 use regex::Regex;
 use tokio_cron_scheduler::Job;
+use chrono_tz::Europe::Zurich;
 
 use crate::models::crons::{NewCron, Cron as DbCron};
 use crate::AppState;
@@ -104,7 +105,7 @@ impl ScheduleClient {
         let command_owned = command.to_string();
 
 
-        let job = match Job::new_async(cron_expression.as_str(), move |_uuid, _lock| {
+        let job = match Job::new_async_tz(cron_expression.as_str(), Zurich, move |_uuid, _lock| {
             let state = Arc::clone(&state_clone);
             let r_id = room_id_owned.clone();
             let cmd = command_owned.clone();

@@ -14,6 +14,7 @@ use matrix_sdk::{
 use tokio::sync::mpsc;
 use tokio::time::{Duration, sleep};
 use tokio_cron_scheduler::JobScheduler;
+use chrono_tz::Europe::Zurich;
 
 mod config;
 mod services;
@@ -161,8 +162,9 @@ async fn recreate_all_cron(state: &Arc<AppState>) {
         let room_id = cron.room.clone();
         let command = cron.command.clone();
 
-        let job = match tokio_cron_scheduler::Job::new_async(
+        let job = match tokio_cron_scheduler::Job::new_async_tz(
             cron.cron_expression.as_str(),
+            Zurich,
             move |_uuid, _lock| {
                 let state = Arc::clone(&state_clone);
                 let r_id = room_id.clone();
