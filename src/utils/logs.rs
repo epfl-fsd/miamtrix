@@ -3,7 +3,7 @@ use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::Subs
 use std::fs;
 
 pub fn init_logging() -> (tracing_appender::non_blocking::WorkerGuard, tracing_appender::non_blocking::WorkerGuard) {
-    let _ = fs::create_dir_all("logs");
+    let _ = fs::create_dir_all("/logs");
 
     let console_layer = fmt::layer()
         .with_target(false);
