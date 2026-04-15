@@ -218,7 +218,7 @@ impl ScheduleClient {
                 .split_whitespace()
                 .nth(5)
                 .unwrap_or("Undefined");
-            let _ = writeln!(message, " - name : **{}** \n task : `{}` \n day(s) : {} \n hour : {} \n id : {} \n", cron.name, cron.command, days, cron.hour, cron.job_id);
+            let _ = writeln!(message, " - name : **{}** \n task : `{}` \n day(s) : {} \n hour : {} \n", cron.name, cron.command, days, cron.hour);
         }
         message
     }
@@ -244,7 +244,7 @@ OPTIONS FOR 'create':
     -h, --hour <HOUR>   Specify the hour to execute the command, 11:30 by default.
 
 OPTIONS FOR 'delete':
-    -n, --name <NAME>   Specify the name of the cron you want delete.
+    -n, --name <NAME>   Specify the name of the cron you want to remove.
 
 DAY PATTERNS:
     You can use cron-style formatting for the <DAYS> parameter:
