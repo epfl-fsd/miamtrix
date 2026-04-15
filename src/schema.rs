@@ -11,3 +11,13 @@ diesel::table! {
         hour -> Varchar,
     }
 }
+
+diesel::table! {
+    locations (id) {
+        id -> Int4,
+        room -> Varchar,
+        location -> Varchar,
+    }
+}
+
+diesel::allow_tables_to_appear_in_same_query!(crons, locations,);
