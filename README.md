@@ -25,10 +25,11 @@ Whether you're looking for where to find fries today (`!oslf`) or want to subscr
 
 - `!schedule <SubCommand> [OPTIONS]`
 > Schedule a command with `create` Sub command or list all task of your room with `-l, --list` Sub command.
-> Only create Sub command has some options :
+> Create Sub command has some options :
 > `-j | --job` for specify the command to execute
 > `-h | --hour` for specify the hour when the command will be executed (by default 11:30)
 > `-d | --day` for specify the day when the command will be executed (by default mon-fri)
+> Delete a cron with `delete` Sub command, you need to specify the name of the task with `-n, --name` flag.
 
 - `!oslf`
 > Returns all menus that contain fries.

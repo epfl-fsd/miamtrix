@@ -152,6 +152,58 @@ impl ScheduleClient {
         }
     }
 
+    async fn delete_cron(args: &str, room_id: &str, state: &Arc<AppState>) -> String {
+        let mut task: Option<String> = None;
+        let mut iter = args.split_whitespace().peekable();
+
+        while let Some(word) = iter.next() {
+            match word {
+                "-n" | "--name" => {
+                    let mut name_parts = Vec::new();
+                    while let Some(&_next_word) = iter.peek() {
+                        name_parts.push(iter.next().unwrap());
+                    }
+                    if !name_parts.is_empty() {
+                        task = Some(name_parts.join(" "));
+                    }
+                }
+                _ => {
+                    continue;
+                }
+            }
+        }
+        let Some(name) = task else {
+            return "Failed to delete cron, please specify the name of the task. Example: `!schedule delete -n task_name`".to_string();
+        };
+
+        let room_crons = DbCron::get_by_room_id(&state.db, room_id).await;
+        let cron_to_delete = room_crons.into_iter().find(|c| c.name == name);
+
+        let Some(cron) = cron_to_delete else {
+            return format!("Error : Unknown task '{}'.", name);
+        };
+
+        if let Ok(uuid) = uuid::Uuid::parse_str(&cron.job_id) {
+            if let Err(e) = state.scheduler.remove(&uuid).await {
+                log::error!("Failed to remove task : {} from room : {}, {}", &name, &room_id, e);
+                return "Failed to remove task, please try again".to_string();
+            } else {
+                log::info!("Task {} remove successfully", uuid);
+            }
+        } else {
+            log::error!("Invalide Id in db : {}", cron.job_id);
+            return "Failed to remove task, please try again".to_string();
+        }
+
+        let db_selected = DbCron::delete_cron(&state.db, room_id, &name).await;
+        if db_selected {
+            format!("Task : `{}` has been removed successfully", name)
+        } else {
+            "Failed to remove task, please try again".to_string()
+        }
+
+    }
+
     async fn list_room_crons(room_id: &str, state: &Arc<AppState>) -> String {
         let room_crons = DbCron::get_by_room_id(&state.db, room_id).await;
 
@@ -166,7 +218,7 @@ impl ScheduleClient {
                 .split_whitespace()
                 .nth(5)
                 .unwrap_or("Undefined");
-            let _ = writeln!(message, " - **{}** | `{}` | {} | {}", cron.name, cron.command, days, cron.hour);
+            let _ = writeln!(message, " - name : **{}** \n task : `{}` \n day(s) : {} \n hour : {} \n", cron.name, cron.command, days, cron.hour);
         }
         message
     }
@@ -182,6 +234,7 @@ USAGE:
 
 SUBCOMMANDS:
     create              Create a new scheduled task.
+    delete              Delete a scheduled task.
     -l, --list          List all scheduled tasks in the current room.
     --help              Print this help message.
 
@@ -189,6 +242,9 @@ OPTIONS FOR 'create':
     -d, --date <DAYS>   Specify the day(s) to execute the command, mon-fri by default.
     -j, --job <CMD>     The exact bot command to run.
     -h, --hour <HOUR>   Specify the hour to execute the command, 11:30 by default.
+
+OPTIONS FOR 'delete':
+    -n, --name <NAME>   Specify the name of the cron you want to remove.
 
 DAY PATTERNS:
     You can use cron-style formatting for the <DAYS> parameter:
@@ -218,6 +274,14 @@ EXAMPLES:
                 let remaining_args = args.trim_start_matches("create").trim();
                 if !remaining_args.is_empty() {
                     Self::controller_create_cron(remaining_args, room_id, state).await
+                } else {
+                    Self::schedule_help().to_string()
+                }
+            }
+            Some("delete") => {
+                let remaining_args = args.trim_start_matches("delete").trim();
+                if !remaining_args.is_empty() {
+                    Self::delete_cron(remaining_args, room_id, state).await
                 } else {
                     Self::schedule_help().to_string()
                 }
